@@ -48,7 +48,9 @@ const SECTIONS=[{"name":"Channel identity","why":"Used on every profile — must
 const ALL=SECTIONS.flatMap(s=>s.items), REQ=ALL.filter(i=>i.req);
 const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"><polygon points="40,62 100,34 100,70 40,98" fill="#b8241c"/><polygon points="160,62 100,34 100,70 160,98" fill="#ff5a4a"/><rect x="40" y="62" width="120" height="108" rx="10" fill="#e6332a"/><polygon points="84,88 84,144 132,116" fill="#fff"/></svg>';
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let vals={}, who=localStorage.getItem("ab-client-who")||"", conn="off", connMsg="Connecting…", pending=false, saveTimer=null;
+let people={}, vals={}, who=localStorage.getItem("ab-client-who")||"", conn="off", connMsg="Connecting…", pending=false, saveTimer=null;
+const slug=n=>String(n||"").trim().toLowerCase().replace(/[.\/#$\[\]]/g,"").replace(/\s+/g," ")||"";
+function loadMine(){ const k=slug(who); vals=(k&&people[k]&&people[k].vals)||{}; }
 const filled=i=>{const v=vals[i.id];return Array.isArray(v)?v.length>0:!!(v&&String(v).trim());};
 
 function field(i){const v=vals[i.id];
@@ -59,8 +61,8 @@ function field(i){const v=vals[i.id];
 function render(){
   const doneReq=REQ.filter(filled).length, doneAll=ALL.filter(filled).length;
   let h=`<header class="top"><div class="brand">${logo}<div><h1>Apple Box — what we need from you</h1><p class="sub">Client checklist for setting up YouTube, Facebook, Instagram and TikTok</p></div></div>
-  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="so we know who answered"></div><div class="status ${conn}"><i></i>${esc(connMsg)}</div></div></header>
-  ${window.AppleBoxStore&&!window.AppleBoxStore.configured?`<div class="banner">This page is not connected yet — answers will not be saved.</div>`:''}
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="type your name first"></div><div class="status ${conn}"><i></i>${esc(connMsg)}</div></div></header>
+  ${window.AppleBoxStore&&!window.AppleBoxStore.configured?`<div class="banner">This page is not connected yet — answers will not be saved.</div>`:(!slug(who)?`<div class="banner">Please type your name in the box at the top first — your answers are saved under your name, so each person on your side can answer separately.</div>`:'')}
   <div class="intro">Please fill in as much as you can — every answer here is something a platform will ask us during setup. Items marked <span class="req">Required</span> block the setup until answered. <b>Everything saves automatically</b> as you type, so you can close this page and come back later on any device.
   <div class="progress"><span>Required</span><div class="bar"><i style="width:${REQ.length?doneReq/REQ.length*100:0}%"></i></div><b class="mono">${doneReq} / ${REQ.length}</b><span>· all items ${doneAll} / ${ALL.length}</span></div></div>`;
   let n=0;
@@ -75,10 +77,10 @@ function updStatus(){const el=document.querySelector('.status'); if(el){el.class
 function persist(){
   if(!window.AppleBoxStore||!window.AppleBoxStore.configured){conn="err";connMsg="Not saved";updStatus();return;}
   clearTimeout(saveTimer); pending=true; conn="saving"; connMsg="Saving…"; updStatus();
-  saveTimer=setTimeout(async()=>{try{await window.AppleBoxStore.merge("intake/answers",{vals},who);pending=false;conn="live";connMsg="Saved";}
+  saveTimer=setTimeout(async()=>{try{const k=slug(who); if(!k){conn="err";connMsg="Type your name first";updStatus();pending=false;return;} const entry={}; entry[k]={vals,name:who,updatedAt:Date.now()}; people[k]=entry[k]; await window.AppleBoxStore.merge("intake/answers",{people:entry},who);pending=false;conn="live";connMsg="Saved as "+who;}
     catch(e){console.error(e);conn="err";connMsg="Save failed: "+(e.code||e.message);} updStatus();},700);
 }
-document.addEventListener('input',e=>{const el=e.target; if(el.id==='who'){who=el.value.trim();localStorage.setItem('ab-client-who',who);return;}
+document.addEventListener('input',e=>{const el=e.target; if(el.id==='who'){who=el.value.trim();localStorage.setItem('ab-client-who',who);clearTimeout(window.__whoT);window.__whoT=setTimeout(()=>{loadMine();render();document.getElementById('who').focus();},900);return;}
   if(!el.dataset||!el.dataset.id) return; const id=el.dataset.id;
   if(el.type==='radio') vals[id]=el.value; else if(el.type==='checkbox') vals[id]=[...document.querySelectorAll(`input[name="${id}"]:checked`)].map(x=>x.value); else vals[id]=el.value;
   el.closest('.q').classList.toggle('ok',filled(ALL.find(i=>i.id===id)));
@@ -89,7 +91,7 @@ render();
 setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not load — check internet / firebase-config.js'; updStatus(); } },8000);
 document.addEventListener('applebox-store-ready',()=>{
   const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";render();return;}
-  S.watch("intake/answers",d=>{ if(pending) return; vals=(d&&d.vals)||{}; conn="live"; connMsg="Saved"; if(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.id) return; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();});
+  S.watch("intake/answers",d=>{ if(pending) return; people=(d&&d.people)||{}; loadMine(); conn="live"; connMsg=slug(who)?"Saved as "+who:"Connected"; if(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.id) return; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();});
 });
 </script>
 </body>

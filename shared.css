@@ -1,0 +1,36 @@
+:root{
+  --bg:#f5f3ef; --surface:#ffffff; --surface-2:#ece9e3; --line:#dcd7cf;
+  --ink:#1d1b18; --ink-2:#5b564f; --ink-3:#8b857c;
+  --accent:#e6332a; --accent-ink:#ffffff;
+  --doing:#b8741a; --doing-bg:#fbeedb; --done:#2f7d4f; --done-bg:#e1f0e6;
+  --todo-bg:#ece9e3; --warn-bg:#fbeedb; --warn:#8a5a12; --focus:#1d1b18;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#151412; --surface:#1f1d1a; --surface-2:#2a2723; --line:#38342e;
+    --ink:#f1ede6; --ink-2:#b7b0a5; --ink-3:#7f786e;
+    --accent:#ff5a4a; --accent-ink:#1a0a08;
+    --doing:#e2a04a; --doing-bg:#3a2c16; --done:#6cc08b; --done-bg:#1b3526;
+    --todo-bg:#2a2723; --warn-bg:#3a2c16; --warn:#e2a04a; --focus:#f1ede6;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Archivo',system-ui,sans-serif;font-size:14px;line-height:1.45;padding-inline:20px;padding-block:20px 60px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 28px;max-width:1600px;margin:0 auto 16px}
+.brand{display:flex;align-items:center;gap:14px}
+.brand svg{flex-shrink:0}
+h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.02em;line-height:1.1;text-wrap:balance}
+.sub{margin:2px 0 0;color:var(--ink-2);font-size:13px}
+.status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-3)}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block}
+.status.live i{background:var(--done)} .status.saving i{background:var(--doing)} .status.err i{background:var(--accent)}
+.banner{max-width:1600px;margin:0 auto 16px;background:var(--warn-bg);color:var(--warn);padding:10px 14px;border-radius:6px;font-size:13px}
+.banner code{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.tabs{max-width:1600px;margin:0 auto 14px;display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tab{padding:8px 14px;font-weight:600;color:var(--ink-3);border-bottom:2px solid transparent;margin-bottom:-1px;min-height:40px}
+.tab.on{color:var(--ink);border-color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.2)}
+@media (max-width:640px){body{padding-inline:16px}}

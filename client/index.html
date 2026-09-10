@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apple Box · What we need from you</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='40' y='62' width='120' height='108' rx='10' fill='%23e6332a'/%3E%3Cpolygon points='84,88 84,144 132,116' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../shared.css">
+<style>
+body{font-size:14.5px;line-height:1.5}
+.wrap{max-width:820px;margin:0 auto}
+.top{margin-bottom:8px}
+.intro{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin:14px 0 22px;font-size:13.5px;color:var(--ink-2)}
+.progress{display:flex;align-items:center;gap:12px;margin-top:10px;font-size:12px;color:var(--ink-2)}
+.bar{flex-grow:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--done)}
+.who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-3)}
+.who input{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:160px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-bottom:18px;overflow:hidden}
+.sh{padding:14px 18px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sh h2{margin:0;font-size:15px;font-weight:600}
+.sh .eyebrow{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:2px}
+.sh .why{font-size:12px;color:var(--ink-3)}
+.sh .count{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.q{display:grid;grid-template-columns:28px 1fr;gap:6px 12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.q:last-child{border-bottom:0}
+.q.ok{background:color-mix(in srgb,var(--done-bg) 45%,var(--surface))}
+.num{font-size:11px;color:var(--ink-3);padding-top:4px}
+.q label.t{font-weight:600;display:block}
+.q .h{font-size:12.5px;color:var(--ink-2);margin:2px 0 8px}
+.q input[type=text],.q textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 11px}
+.q textarea{min-height:64px;resize:vertical}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:16px;padding:6px 12px;font-size:13px;cursor:pointer;min-height:32px;background:var(--bg)}
+.opts input{margin:0;accent-color:var(--accent)}
+.opts label:has(input:checked){background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.req{color:var(--accent);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-left:6px}
+.foot{color:var(--ink-3);font-size:12px;margin-top:8px}
+@media (max-width:640px){.q{grid-template-columns:1fr}.num{display:none}}
+</style>
+</head>
+<body>
+<div id="root" class="wrap"></div>
+<script src="../firebase-config.js"></script>
+<script type="module" src="../store.js"></script>
+<script>
+const SECTIONS=[{"name":"Channel identity","why":"Used on every profile — must be final before anything is created.","items":[{"id":"name_ok","t":"Channel name and handle","k":"choice","o":["Keep “Apple Box” with @appleboxlk","Keep “Apple Box”, but I prefer a different handle","Change the channel name"],"req":1,"h":"The channel name is what viewers see (“Apple Box”). The handle is the @username in the link. We checked: @applebox is already taken on YouTube, so it cannot be used. Our suggestion is @appleboxlk — the same on YouTube, Facebook, Instagram and TikTok."},{"id":"handle_alt","t":"If you chose a different handle or a new name, write 2–3 options in order of preference","k":"textarea","h":"Examples: @appleboxmedia, @appleboxtv, @appleboxfilms. We will check which ones are free on all four platforms and confirm with you before creating anything."},{"id":"tagline","t":"One-line tagline (optional)","k":"text","h":"Shown under the name in bios. Example: “Short films and shows from Sri Lanka.”"},{"id":"logo","t":"Logo — do you already have one?","k":"choice","o":["Yes — we will send the files","We have a rough idea or sketch","No — please design one for us"],"req":1,"h":"If you have a logo, please send the original files (AI, SVG, PDF or the largest PNG you have). If not, we will prepare options for you to choose from."},{"id":"logo_notes","t":"Logo brief: colours, style, and anything to include or avoid","k":"textarea","req":1,"h":"Example: “Red and black, modern, should feel like a film studio. No apple fruit.” If you already have a logo, tell us the exact colour codes if you know them."},{"id":"logo_send","t":"How will you send the logo files?","k":"text","h":"Google Drive link, WeTransfer, WhatsApp or email — and to whom."},{"id":"lang","t":"Languages","k":"multi","o":["Sinhala","Tamil","English"],"req":1,"h":"Tick all that apply. This decides bios, titles, captions and subtitles."},{"id":"lang_main","t":"Main language for titles and descriptions","k":"choice","o":["Sinhala","Tamil","English"],"req":1}]},{"name":"Company details","why":"Needed to fill the About sections and to keep account ownership with the company.","items":[{"id":"company","t":"Legal company / business name","k":"text","req":1,"h":"Exactly as on the business registration. Used for copyright line and monetisation."},{"id":"reg_no","t":"Business registration number (if registered)","k":"text","h":"Needed later for YouTube monetisation and TikTok Business verification."},{"id":"address","t":"Business address","k":"textarea","req":1,"h":"Shown on the Facebook Page (can be hidden) and used for AdSense later."},{"id":"website","t":"Website (if any)","k":"text","h":"Leave empty if none — we can link to YouTube instead."},{"id":"existing","t":"Any existing social media accounts or pages for this business?","k":"textarea","h":"Give links. We may reuse or merge them instead of creating new ones."}]},{"name":"Business email and phone","why":"Every platform needs an email and a mobile number for sign-up, security codes and recovery. These decide who really controls the channel.","items":[{"id":"email_have","t":"Do you already have a business email for Apple Box?","k":"choice","o":["Yes — details below","No — please create one"],"req":1},{"id":"email_existing","t":"If yes: the email address","k":"text","h":"We will need a way to sign in to it, or you can create the accounts with us on a call."},{"id":"email_new","t":"If no: preferred new email name","k":"text","h":"Example: applebox.media@gmail.com or applebox.lk@gmail.com. We will check what is free."},{"id":"recovery_email","t":"Recovery email (a second address owned by the company or director)","k":"text","req":1,"h":"Used to get back in if the password is lost. Must NOT be the same as the main email."},{"id":"mobile","t":"Business mobile number for security codes (2-step verification)","k":"text","req":1,"h":"This phone receives login codes from Google, Facebook, Instagram and TikTok. It should be a company phone or the director's phone, not a staff member's personal phone."},{"id":"mobile_owner","t":"Whose phone is this, and is it available during the setup?","k":"text","req":1,"h":"We will need them to read out codes 4–6 times during setup."},{"id":"mobile2","t":"Backup mobile number (optional but recommended)","k":"text"},{"id":"contact_email","t":"Public contact email for business enquiries","k":"text","req":1,"h":"Shown publicly on YouTube About and in bios. Can be the same as the business email."},{"id":"whatsapp","t":"WhatsApp number for the Facebook Page button (optional)","k":"text","h":"Facebook can show a “WhatsApp” button so viewers can message you."}]},{"name":"Who has access","why":"Platforms ask for named people. Owners can remove everyone else, so choose carefully.","items":[{"id":"owner_person","t":"Account owner (one person, usually the director)","k":"text","req":1,"h":"Name, personal email, mobile. This person is the final owner on all platforms."},{"id":"owner_dob","t":"Owner’s date of birth","k":"text","req":1,"h":"Google and TikTok ask for this at sign-up. The owner must be 18 or older."},{"id":"admins","t":"Other people who need admin access","k":"textarea","h":"Name, email and role for each. Example: “Nimal — nimal@… — posts videos”."},{"id":"facebook_profiles","t":"Personal Facebook profiles of the admins","k":"textarea","req":1,"h":"A Facebook Page can only be created and managed from a personal Facebook account. Please give the profile names or links of the owner and 1–2 admins. These are never shown to the public — viewers only see the Apple Box Page. Important: do not create a new “fake” personal account just for this. Facebook disables such accounts quickly, and if it was the only admin the Page is lost. We will also put the Page inside a company Meta Business Portfolio so it belongs to the business, not to one person."},{"id":"pm_access","t":"Confirm the project lead (Danika) can have admin access during setup","k":"choice","o":["Yes","Only with someone present"],"req":1},{"id":"pwmanager","t":"Password manager: OK to store all logins in a shared vault (Bitwarden / 1Password)?","k":"choice","o":["Yes","We prefer another way"],"req":1}]},{"name":"Content and schedule","why":"Bios, playlists, thumbnails and the posting plan are built from this.","items":[{"id":"formats","t":"Content types","k":"multi","o":["Short movies","Web series","News / current affairs","Talk show / interviews","Live streams","Music","Comedy sketches","Behind the scenes","Other"],"req":1},{"id":"audience","t":"Who is the audience?","k":"textarea","req":1,"h":"Age range, location (Sri Lanka only or also overseas Sri Lankans), interests."},{"id":"kids","t":"Is any content made for children (under 13)?","k":"choice","o":["No","Yes","Some"],"req":1,"h":"YouTube legally requires this setting on every video. Wrong answers can get videos removed."},{"id":"examples","t":"3–5 channels you like the look of","k":"textarea","h":"Links. Tell us what you like about each."},{"id":"category","t":"Facebook Page category","k":"choice","o":["TV Channel","Media/News Company","Movie / Film","Entertainment website"],"req":1}]},{"name":"Rights, credits and legal","why":"Copyright problems are the number one reason new channels get removed.","items":[{"id":"credits","t":"Standard credits to show on every video","k":"textarea","h":"Production company, director, main cast, “Produced by …”."},{"id":"copyright_line","t":"Copyright notice text","k":"text","h":"Example: “© 2026 Apple Box Productions (Pvt) Ltd. All rights reserved.”"},{"id":"trademark","t":"Is the name Apple Box registered as a trademark or business name?","k":"choice","o":["Yes","No","In progress"]}]},{"name":"Money and tools","why":"Small paid tools make the channel look professional; earning later needs the right names on the accounts.","items":[{"id":"monetise_name","t":"Whose name will the AdSense / payment account be in?","k":"text","req":1,"h":"Company or a director. This cannot easily be changed later."},{"id":"ad_budget","t":"Budget for launch promotion (boosted posts)","k":"choice","o":["None","LKR 5,000–10,000","LKR 10,000–25,000","More"],"req":1}]},{"name":"Brand assets you can send","why":"Anything that already exists saves design time and keeps things consistent.","items":[{"id":"assets","t":"Existing brand files","k":"multi","o":["Logo files","Brand colours","Fonts","Photos of the team / studio","Film posters / stills","None yet"]},{"id":"assets_where","t":"Where can we collect them?","k":"text","h":"Shared Drive link, WeTransfer, or “will email”."},{"id":"bio_facts","t":"Three facts about Apple Box for the About section","k":"textarea","req":1,"h":"Example: when it started, who is behind it, what makes it different."},{"id":"launch_target","t":"Anything else we should know?","k":"textarea"}]}];
+const ALL=SECTIONS.flatMap(s=>s.items), REQ=ALL.filter(i=>i.req);
+const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"><polygon points="40,62 100,34 100,70 40,98" fill="#b8241c"/><polygon points="160,62 100,34 100,70 160,98" fill="#ff5a4a"/><rect x="40" y="62" width="120" height="108" rx="10" fill="#e6332a"/><polygon points="84,88 84,144 132,116" fill="#fff"/></svg>';
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let vals={}, who=localStorage.getItem("ab-client-who")||"", conn="off", connMsg="Connecting…", pending=false, saveTimer=null;
+const filled=i=>{const v=vals[i.id];return Array.isArray(v)?v.length>0:!!(v&&String(v).trim());};
+
+function field(i){const v=vals[i.id];
+  if(i.k==="text") return `<input type="text" id="${i.id}" data-id="${i.id}" value="${esc(v||'')}" placeholder="Type here">`;
+  if(i.k==="textarea") return `<textarea id="${i.id}" data-id="${i.id}" placeholder="Type here">${esc(v||'')}</textarea>`;
+  const type=i.k==="choice"?'radio':'checkbox', arr=Array.isArray(v)?v:(v?[v]:[]);
+  return `<div class="opts">${i.o.map((o,n)=>`<label><input type="${type}" name="${i.id}" id="${i.id}-${n}" data-id="${i.id}" value="${esc(o)}" ${arr.includes(o)?'checked':''}>${esc(o)}</label>`).join('')}</div>`;}
+function render(){
+  const doneReq=REQ.filter(filled).length, doneAll=ALL.filter(filled).length;
+  let h=`<header class="top"><div class="brand">${logo}<div><h1>Apple Box — what we need from you</h1><p class="sub">Client checklist for setting up YouTube, Facebook, Instagram and TikTok</p></div></div>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="so we know who answered"></div><div class="status ${conn}"><i></i>${esc(connMsg)}</div></div></header>
+  ${window.AppleBoxStore&&!window.AppleBoxStore.configured?`<div class="banner">This page is not connected yet — answers will not be saved.</div>`:''}
+  <div class="intro">Please fill in as much as you can — every answer here is something a platform will ask us during setup. Items marked <span class="req">Required</span> block the setup until answered. <b>Everything saves automatically</b> as you type, so you can close this page and come back later on any device.
+  <div class="progress"><span>Required</span><div class="bar"><i style="width:${REQ.length?doneReq/REQ.length*100:0}%"></i></div><b class="mono">${doneReq} / ${REQ.length}</b><span>· all items ${doneAll} / ${ALL.length}</span></div></div>`;
+  let n=0;
+  SECTIONS.forEach((s,si)=>{const c=s.items.filter(filled).length;
+    h+=`<section><div class="sh"><div><span class="eyebrow">Part ${si+1}</span><h2>${esc(s.name)}</h2><div class="why">${esc(s.why)}</div></div><span class="count mono">${c}/${s.items.length}</span></div>`;
+    s.items.forEach(i=>{n++;h+=`<div class="q ${filled(i)?'ok':''}"><div class="num mono">${String(n).padStart(2,'0')}</div><div><label class="t" for="${i.id}">${esc(i.t)}${i.req?'<span class="req">Required</span>':''}</label>${i.h?`<div class="h">${esc(i.h)}</div>`:''}${field(i)}</div></div>`;});
+    h+=`</section>`;});
+  h+=`<p class="foot">Prepared by Danika Munasinghe for the Apple Box channel setup. Questions: reply on the same thread this link came from.</p>`;
+  document.getElementById('root').innerHTML=h;
+}
+function updStatus(){const el=document.querySelector('.status'); if(el){el.className='status '+conn; el.innerHTML='<i></i>'+esc(connMsg);}}
+function persist(){
+  if(!window.AppleBoxStore||!window.AppleBoxStore.configured){conn="err";connMsg="Not saved";updStatus();return;}
+  clearTimeout(saveTimer); pending=true; conn="saving"; connMsg="Saving…"; updStatus();
+  saveTimer=setTimeout(async()=>{try{await window.AppleBoxStore.merge("intake/answers",{vals},who);pending=false;conn="live";connMsg="Saved";}
+    catch(e){console.error(e);conn="err";connMsg="Save failed: "+(e.code||e.message);} updStatus();},700);
+}
+document.addEventListener('input',e=>{const el=e.target; if(el.id==='who'){who=el.value.trim();localStorage.setItem('ab-client-who',who);return;}
+  if(!el.dataset||!el.dataset.id) return; const id=el.dataset.id;
+  if(el.type==='radio') vals[id]=el.value; else if(el.type==='checkbox') vals[id]=[...document.querySelectorAll(`input[name="${id}"]:checked`)].map(x=>x.value); else vals[id]=el.value;
+  el.closest('.q').classList.toggle('ok',filled(ALL.find(i=>i.id===id)));
+  // refresh counters without re-rendering the field being typed in
+  const req=REQ.filter(filled).length, all=ALL.filter(filled).length; const p=document.querySelector('.progress'); if(p){p.querySelector('.bar i').style.width=(REQ.length?req/REQ.length*100:0)+'%'; p.querySelector('b').textContent=req+' / '+REQ.length; p.querySelectorAll('span')[1].textContent='· all items '+all+' / '+ALL.length;}
+  persist();});
+render();
+setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not load — check internet / firebase-config.js'; updStatus(); } },8000);
+document.addEventListener('applebox-store-ready',()=>{
+  const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";render();return;}
+  S.watch("intake/answers",d=>{ if(pending) return; vals=(d&&d.vals)||{}; conn="live"; connMsg="Saved"; if(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.id) return; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();});
+});
+</script>
+</body>
+</html>

@@ -78,7 +78,7 @@ const ICON={todo:'<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.5" fill="n
 const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"><polygon points="40,62 100,34 100,70 40,98" fill="#b8241c"/><polygon points="160,62 100,34 100,70 160,98" fill="#ff5a4a"/><rect x="40" y="62" width="120" height="108" rx="10" fill="#e6332a"/><polygon points="84,88 84,144 132,116" fill="#fff"/></svg>';
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let status={}, owners={}, answers=null, answersMeta="";
+let status={}, owners={}, answers=null, answersMeta="", person=null;
 let tab=localStorage.getItem("ab-tab")||"board", filterOwner="all", openSet=new Set();
 let who=localStorage.getItem("ab-who")||"", conn="off", connMsg="Connecting…";
 const OWNER_LIST=[...new Set(PHASES.flatMap(p=>p.stories.map(s=>s.owner)))];
@@ -116,12 +116,18 @@ function boardHTML(){
   return h+`</main>`;
 }
 function answersHTML(){
-  if(!answers) return `<div class="answers"><section><div class="sh">No answers yet</div><div class="ans"><div class="v empty">When the client fills in the client page, their answers appear here live.</div></div></section></div>`;
-  const v=answers.vals||{};
-  let h=`<div class="meta">Last updated ${answersMeta}</div><div class="answers">`;
+  const people=(answers&&answers.people)||{}; const keys=Object.keys(people).sort((a,b)=>(people[b].updatedAt||0)-(people[a].updatedAt||0));
+  if(answers&&answers.vals&&Object.keys(answers.vals).length) { people["_legacy"]={vals:answers.vals,name:"(no name)",updatedAt:0}; if(!keys.includes("_legacy")) keys.push("_legacy"); }
+  if(!keys.length) return `<div class="answers"><section><div class="sh">No answers yet</div><div class="ans"><div class="v empty">When someone fills in the client page, their answers appear here, one set per person.</div></div></section></div>`;
+  if(!person||!people[person]) person=keys[0];
+  const p=people[person], v=p.vals||{};
+  let h=`<div class="filters" style="max-width:900px"><span class="fl">Submitted by</span>${keys.map(k=>`<button class="chip ${k===person?'on':''}" data-person="${esc(k)}">${esc(people[k].name||k)}</button>`).join('')}</div>`;
+  h+=`<div class="meta">${esc(p.name||person)} · last updated ${p.updatedAt?new Date(p.updatedAt).toLocaleString():'—'}</div><div class="answers">`;
   SECTIONS.forEach((sec,i)=>{const done=sec.items.filter(it=>{const x=v[it.id];return Array.isArray(x)?x.length:!!(x&&String(x).trim());}).length;
     h+=`<section><div class="sh">Part ${i+1} · ${esc(sec.name)}<span class="mono">${done}/${sec.items.length}</span></div>`;
-    sec.items.forEach(it=>{const x=v[it.id];const val=Array.isArray(x)?x.join(", "):(x||"");h+=`<div class="ans ${it.req?'req':''}"><div class="q">${esc(it.t)}</div><div class="v ${val?'':'empty'}">${val?esc(val):'—'}</div></div>`;});
+    sec.items.forEach(it=>{const x=v[it.id];const val=Array.isArray(x)?x.join(", "):(x||"");
+      const others=keys.filter(k=>k!==person).map(k=>{const y=(people[k].vals||{})[it.id];const yv=Array.isArray(y)?y.join(", "):(y||"");return yv&&yv!==val?`<div class="v" style="font-size:12px;color:var(--ink-3);margin-top:4px">${esc(people[k].name||k)}: ${esc(yv)}</div>`:'';}).join('');
+      h+=`<div class="ans ${it.req?'req':''}"><div class="q">${esc(it.t)}</div><div><div class="v ${val?'':'empty'}">${val?esc(val):'—'}</div>${others}</div></div>`;});
     h+=`</section>`;});
   return h+`</div>`;
 }
@@ -140,6 +146,7 @@ document.addEventListener('click',e=>{
   const t=e.target.closest('[data-tab]'); if(t){tab=t.dataset.tab;localStorage.setItem('ab-tab',tab);render();return;}
   const b=e.target.closest('.st'); if(b){const k=b.dataset.k;status[k]=ORDER[(ORDER.indexOf(status[k]||'todo')+1)%3];render();persist();return;}
   const m=e.target.closest('.more'); if(m){const k=m.dataset.more;openSet.has(k)?openSet.delete(k):openSet.add(k);render();return;}
+  const pp=e.target.closest('[data-person]'); if(pp){person=pp.dataset.person;render();return;}
   const f=e.target.closest('.chip'); if(f){filterOwner=f.dataset.f;render();}
 });
 document.addEventListener('change',e=>{
@@ -151,7 +158,7 @@ setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not 
 document.addEventListener('applebox-store-ready',()=>{
   const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";render();return;}
   S.watch("board/state",d=>{ if(pending) return; status=(d&&d.status)||{}; owners=(d&&d.owners)||{}; conn="live"; connMsg=d&&d.updatedBy?`Live · last change by ${d.updatedBy}`:"Live"; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();});
-  S.watch("intake/answers",d=>{ answers=d; if(d&&d.updatedAt&&d.updatedAt.toDate){ answersMeta=d.updatedAt.toDate().toLocaleString()+(d.updatedBy?" by "+d.updatedBy:""); } if(tab==='answers') render(); });
+  S.watch("intake/answers",d=>{ answers=d; if(tab==='answers') render(); });
 });
 </script>
 </body>

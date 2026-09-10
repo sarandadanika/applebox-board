@@ -1,7 +1,7 @@
 // Tiny Firestore wrapper used by both pages.
 // Exposes: AppleBoxStore.ready (Promise), .watch(path, cb), .merge(path, data)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const cfg = window.APPLEBOX_FIREBASE || {};
 const configured = cfg.projectId && cfg.projectId !== "PASTE_HERE";
@@ -21,6 +21,14 @@ window.AppleBoxStore = {
     if (!db) throw new Error("not_configured");
     const [col, id] = path.split("/");
     await setDoc(doc(db, col, id), { ...data, updatedAt: serverTimestamp(), updatedBy: who || "" }, { merge: true });
+  },
+  // Remove fields (dot paths, e.g. "people.john") from a document.
+  async removeFields(path, fields, who) {
+    if (!db) throw new Error("not_configured");
+    const [col, id] = path.split("/");
+    const upd = { updatedAt: serverTimestamp(), updatedBy: who || "" };
+    fields.forEach(f => { upd[f] = deleteField(); });
+    await updateDoc(doc(db, col, id), upd);
   }
 };
 document.dispatchEvent(new Event("applebox-store-ready"));

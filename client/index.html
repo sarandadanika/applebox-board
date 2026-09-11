@@ -49,6 +49,9 @@ const ALL=SECTIONS.flatMap(s=>s.items), REQ=ALL.filter(i=>i.req);
 const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"><polygon points="40,62 100,34 100,70 40,98" fill="#b8241c"/><polygon points="160,62 100,34 100,70 160,98" fill="#ff5a4a"/><rect x="40" y="62" width="120" height="108" rx="10" fill="#e6332a"/><polygon points="84,88 84,144 132,116" fill="#fff"/></svg>';
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let people={}, vals={}, who=localStorage.getItem("ab-client-who")||"", conn="off", connMsg="Connecting…", pending=false, saveTimer=null;
+let code=localStorage.getItem("ab-client-code")||"", gate="code", gateMsg="", unwatch=null; // gate: code | checking | open
+const codeSlug=c=>String(c||"").trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
+const docPath=()=>"intake/client-"+codeSlug(code);
 const slug=n=>String(n||"").trim().toLowerCase().replace(/[.\/#$\[\]]/g,"").replace(/\s+/g," ")||"";
 function loadMine(){ const k=slug(who); vals=(k&&people[k]&&people[k].vals)||{}; }
 const filled=i=>{const v=vals[i.id];return Array.isArray(v)?v.length>0:!!(v&&String(v).trim());};
@@ -58,7 +61,15 @@ function field(i){const v=vals[i.id];
   if(i.k==="textarea") return `<textarea id="${i.id}" data-id="${i.id}" placeholder="Type here">${esc(v||'')}</textarea>`;
   const type=i.k==="choice"?'radio':'checkbox', arr=Array.isArray(v)?v:(v?[v]:[]);
   return `<div class="opts">${i.o.map((o,n)=>`<label><input type="${type}" name="${i.id}" id="${i.id}-${n}" data-id="${i.id}" value="${esc(o)}" ${arr.includes(o)?'checked':''}>${esc(o)}</label>`).join('')}</div>`;}
+function gateHTML(){
+  return `<header class="top"><div class="brand">${logo}<div><h1>Apple Box — what we need from you</h1><p class="sub">Client checklist for setting up YouTube, Facebook, Instagram and TikTok</p></div></div></header>
+  <section style="max-width:520px;margin:40px auto"><div class="sh"><div><span class="eyebrow">Private page</span><h2>Enter your access code</h2><div class="why">Danika sent you a short code together with this link. Type it to open the checklist.</div></div></div>
+  <div style="padding:18px"><form id="gate" style="display:flex;gap:8px;flex-wrap:wrap"><input id="codeIn" type="text" autocomplete="off" autocapitalize="off" value="${esc(code)}" placeholder="access code" style="flex:1;min-width:180px;font:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)"><button type="submit" style="font:inherit;font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;border:0;background:var(--ink);color:var(--bg);cursor:pointer">${gate==='checking'?'Checking…':'Open checklist'}</button></form>
+  ${gateMsg?`<div class="banner" style="margin:14px 0 0">${esc(gateMsg)}</div>`:''}</div></section>
+  <p class="foot">Prepared by Danika Munasinghe for the Apple Box channel setup. Questions: reply on the same thread this link came from.</p>`;
+}
 function render(){
+  if(gate!=='open'){document.getElementById('root').innerHTML=gateHTML();return;}
   const doneReq=REQ.filter(filled).length, doneAll=ALL.filter(filled).length;
   let h=`<header class="top"><div class="brand">${logo}<div><h1>Apple Box — what we need from you</h1><p class="sub">Client checklist for setting up YouTube, Facebook, Instagram and TikTok</p></div></div>
   <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="type your name first"></div><div class="status ${conn}"><i></i>${esc(connMsg)}</div></div></header>
@@ -77,7 +88,7 @@ function updStatus(){const el=document.querySelector('.status'); if(el){el.class
 function persist(){
   if(!window.AppleBoxStore||!window.AppleBoxStore.configured){conn="err";connMsg="Not saved";updStatus();return;}
   clearTimeout(saveTimer); pending=true; conn="saving"; connMsg="Saving…"; updStatus();
-  saveTimer=setTimeout(async()=>{try{const k=slug(who); if(!k){conn="err";connMsg="Type your name first";updStatus();pending=false;return;} const entry={}; entry[k]={vals,name:who,updatedAt:Date.now()}; people[k]=entry[k]; await window.AppleBoxStore.merge("intake/answers",{people:entry},who);pending=false;conn="live";connMsg="Saved as "+who;}
+  saveTimer=setTimeout(async()=>{try{const k=slug(who); if(!k){conn="err";connMsg="Type your name first";updStatus();pending=false;return;} const entry={}; entry[k]={vals,name:who,updatedAt:Date.now()}; people[k]=entry[k]; await window.AppleBoxStore.merge(docPath(),{people:entry},who);pending=false;conn="live";connMsg="Saved as "+who;}
     catch(e){console.error(e);conn="err";connMsg="Save failed: "+(e.code||e.message);} updStatus();},700);
 }
 document.addEventListener('input',e=>{const el=e.target; if(el.id==='who'){who=el.value.trim();localStorage.setItem('ab-client-who',who);clearTimeout(window.__whoT);window.__whoT=setTimeout(()=>{loadMine();render();document.getElementById('who').focus();},900);return;}
@@ -89,9 +100,24 @@ document.addEventListener('input',e=>{const el=e.target; if(el.id==='who'){who=e
   persist();});
 render();
 setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not load — check internet / firebase-config.js'; updStatus(); } },8000);
+function openWithCode(){
+  const S=window.AppleBoxStore; if(!S||!S.configured){gateMsg="Not connected — please try again later.";render();return;}
+  if(!codeSlug(code)){gateMsg="Please type the access code.";render();return;}
+  gate="checking"; gateMsg=""; render();
+  if(unwatch) unwatch();
+  let first=true;
+  unwatch=S.watch(docPath(),d=>{
+    if(d===null){ if(first){ gate="code"; gateMsg="That code was not recognised. Please check it (it is not case-sensitive) or ask Danika."; localStorage.removeItem("ab-client-code"); render(); } return; }
+    first=false; localStorage.setItem("ab-client-code",code);
+    if(pending) return; people=(d&&d.people)||{}; loadMine(); conn="live"; connMsg=slug(who)?"Saved as "+who:"Connected";
+    if(gate!=='open'){gate="open";render();return;}
+    if(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.id) return; render();
+  },err=>{gate="code";gateMsg="Connection error: "+err.code;render();});
+}
+document.addEventListener('submit',e=>{ if(e.target.id==='gate'){e.preventDefault(); code=document.getElementById('codeIn').value; openWithCode();} });
 document.addEventListener('applebox-store-ready',()=>{
-  const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";render();return;}
-  S.watch("intake/answers",d=>{ if(pending) return; people=(d&&d.people)||{}; loadMine(); conn="live"; connMsg=slug(who)?"Saved as "+who:"Connected"; if(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.id) return; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();});
+  const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";gateMsg="Not connected";render();return;}
+  conn="live"; if(codeSlug(code)) openWithCode(); else render();
 });
 </script>
 </body>

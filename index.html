@@ -81,6 +81,11 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 let status={}, owners={}, answers=null, answersMeta="", person=null, delArm=null;
 let tab=localStorage.getItem("ab-tab")||"board", filterOwner="all", openSet=new Set();
 let who=localStorage.getItem("ab-who")||"", conn="off", connMsg="Connecting…";
+let user=undefined, team=null, teamErr="", authMsg="", unwatchBoard=null, unwatchAns=null, teamOpen=false, teamBusy="";
+const BOOTSTRAP=["danika.saranda@gmail.com","saranda.danika@gmail.com"]; // may create the team list the first time
+const codeSlug=c=>String(c||"").trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
+const answersPath=()=>team&&codeSlug(team.clientCode)?"intake/client-"+codeSlug(team.clientCode):null;
+const isTeam=()=>!!(user&&team&&Array.isArray(team.emails)&&team.emails.map(e=>e.toLowerCase()).includes((user.email||"").toLowerCase()));
 const OWNER_LIST=[...new Set(PHASES.flatMap(p=>p.stories.map(s=>s.owner)))];
 const counts=list=>{const c={todo:0,doing:0,done:0};list.forEach(s=>c[s]++);return c;};
 const barHTML=(c,total)=>`<div class="bar"><i class="d" style="width:${total?c.done/total*100:0}%"></i><i class="p" style="width:${total?c.doing/total*100:0}%"></i></div>`;
@@ -97,7 +102,7 @@ function header(){
       <div class="status ${conn}"><i></i>${esc(connMsg)}</div>
     </div></header>
     ${window.AppleBoxStore&&!window.AppleBoxStore.configured?`<div class="banner">Not connected yet — open <code>firebase-config.js</code> and paste your Firebase settings (see README). Until then, changes are not saved.</div>`:''}
-    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Task board</button><button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button></nav>`;
+    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Task board</button><button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
 }
 function boardHTML(){
   let h=`<div class="filters"><span class="fl">Show</span><button class="chip ${filterOwner==='all'?'on':''}" data-f="all">Everyone</button>${OWNER_LIST.map(o=>`<button class="chip ${filterOwner===o?'on':''}" data-f="${esc(o)}">${esc(o)}</button>`).join('')}</div><main class="board">`;
@@ -118,6 +123,7 @@ function boardHTML(){
 function answersHTML(){
   const people=(answers&&answers.people)||{}; const keys=Object.keys(people).sort((a,b)=>(people[b].updatedAt||0)-(people[a].updatedAt||0));
   if(answers&&answers.vals&&Object.keys(answers.vals).length) { people["_legacy"]={vals:answers.vals,name:"(no name)",updatedAt:0}; if(!keys.includes("_legacy")) keys.push("_legacy"); }
+  if(!answersPath()) return `<div class="answers"><section><div class="sh">No client access code yet</div><div class="ans"><div class="v empty">Open “Team &amp; access” and set a client access code first. Then send the code to the client with the checklist link.</div></div></section></div>`;
   if(!keys.length) return `<div class="answers"><section><div class="sh">No answers yet</div><div class="ans"><div class="v empty">When someone fills in the client page, their answers appear here, one set per person.</div></div></section></div>`;
   if(!person||!people[person]) person=keys[0];
   const p=people[person], v=p.vals||{};
@@ -132,7 +138,33 @@ function answersHTML(){
     h+=`</section>`;});
   return h+`</div>`;
 }
-function render(){document.getElementById('root').innerHTML=header()+(tab==='board'?boardHTML():answersHTML());}
+function loginHTML(msg){
+  return `<header class="top"><div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">Internal · team members only</p></div></div></header>
+  <section style="max-width:520px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px">
+    <h2 style="margin:0 0 6px;font-size:16px">Sign in to continue</h2><p style="margin:0 0 16px;font-size:13px;color:var(--ink-2)">Use the Google account that Danika added to the team list.</p>
+    ${user===undefined?`<div class="status saving"><i></i>Checking sign-in…</div>`:`<button class="chip" data-signin="1" style="font-size:14px;padding:10px 16px;min-height:40px;background:var(--ink);color:var(--bg);border-color:var(--ink)">Sign in with Google</button>`}
+    ${msg?`<div class="banner" style="margin:16px 0 0">${esc(msg)}</div>`:''}
+    ${user?`<div style="margin-top:14px;font-size:12px;color:var(--ink-3)">Signed in as ${esc(user.email)} · <a href="#" data-signout="1">use another account</a></div>`:''}
+  </section>`;
+}
+function teamHTML(){
+  const emails=(team&&team.emails)||[];
+  return `<div class="answers"><section><div class="sh">Team members (can open this board)</div>
+    ${emails.map(e=>`<div class="ans"><div class="q">${esc(e)}</div><div>${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
+    <div class="ans"><div class="q">Add a teammate</div><div><form data-add-email="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="email" required placeholder="their Gmail address" style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"><button class="chip" type="submit">Add</button></form><div class="v empty" style="font-size:12px;margin-top:6px">They sign in with Google using this exact address.</div></div></div>
+  </section>
+  <section><div class="sh">Client access code</div>
+    <div class="ans"><div class="q">Current code</div><div><b class="mono">${esc(team.clientCode||'— not set —')}</b><div class="v empty" style="font-size:12px;margin-top:4px">Send this code to the client together with the checklist link. They type it to open the page.</div></div></div>
+    <div class="ans"><div class="q">Change code</div><div><form data-set-code="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" required minlength="6" pattern="[A-Za-z0-9-]+" placeholder="letters and numbers, min 6" style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"><button class="chip" type="submit">Set code</button></form><div class="v empty" style="font-size:12px;margin-top:6px">Changing the code starts a fresh answer set — answers given under the old code stay stored but are no longer shown here.</div></div></div>
+  </section>${teamBusy?`<div class="meta">${esc(teamBusy)}</div>`:''}</div>`;
+}
+function render(){
+  const root=document.getElementById('root');
+  if(!user){ root.innerHTML=loginHTML(authMsg); return; }
+  if(!team){ root.innerHTML=loginHTML(teamErr||"Loading team list…"); return; }
+  if(!isTeam()){ root.innerHTML=loginHTML(`${user.email} is not on the team list. Ask Danika to add you under “Team & access”.`); return; }
+  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='team'?teamHTML():answersHTML());
+}
 
 let saveTimer=null, pending=false;
 function persist(){
@@ -144,6 +176,9 @@ function persist(){
 function updStatus(){const el=document.querySelector('.status'); if(el){el.className='status '+conn; el.innerHTML='<i></i>'+esc(connMsg);}}
 
 document.addEventListener('click',e=>{
+  if(e.target.closest('[data-signin]')){authMsg="";render();window.AppleBoxStore.signIn().catch(err=>{authMsg="Sign-in failed: "+(err.code||err.message);render();});return;}
+  if(e.target.closest('[data-signout]')){e.preventDefault();window.AppleBoxStore.signOut();return;}
+  const rm=e.target.closest('[data-rm-email]'); if(rm){saveTeam({emails:team.emails.filter(x=>x!==rm.dataset.rmEmail)});return;}
   const t=e.target.closest('[data-tab]'); if(t){tab=t.dataset.tab;localStorage.setItem('ab-tab',tab);render();return;}
   const b=e.target.closest('.st'); if(b){const k=b.dataset.k;status[k]=ORDER[(ORDER.indexOf(status[k]||'todo')+1)%3];render();persist();return;}
   const m=e.target.closest('.more'); if(m){const k=m.dataset.more;openSet.has(k)?openSet.delete(k):openSet.add(k);render();return;}
@@ -151,9 +186,23 @@ document.addEventListener('click',e=>{
   const da=e.target.closest('[data-delarm]'); if(da){delArm=da.dataset.delarm;render();return;}
   if(e.target.closest('[data-delcancel]')){delArm=null;render();return;}
   const dd=e.target.closest('[data-del]'); if(dd){const k=dd.dataset.del; delArm=null; person=null; conn="saving"; connMsg="Deleting…"; updStatus();
-    (k==="_legacy"?window.AppleBoxStore.removeFields("intake/answers",["vals"],who):window.AppleBoxStore.removeFields("intake/answers",["people."+k],who))
+    (k==="_legacy"?window.AppleBoxStore.removeFields(answersPath(),["vals"],who):window.AppleBoxStore.removeFields(answersPath(),["people."+k],who))
       .then(()=>{conn="live";connMsg="Deleted";updStatus();}).catch(err=>{console.error(err);conn="err";connMsg="Delete failed: "+(err.code||err.message);updStatus();}); return;}
   const f=e.target.closest('.chip'); if(f){filterOwner=f.dataset.f;render();}
+});
+async function saveTeam(patch){
+  teamBusy="Saving…"; render();
+  try{ await window.AppleBoxStore.merge("config/team",patch,user.email); teamBusy=""; }
+  catch(err){ console.error(err); teamBusy="Save failed: "+(err.code||err.message); render(); }
+}
+document.addEventListener('submit',async e=>{
+  const f=e.target; if(!f.dataset) return;
+  if(f.dataset.addEmail){e.preventDefault(); const v=f.querySelector('input').value.trim().toLowerCase(); if(v&&!team.emails.includes(v)) await saveTeam({emails:[...team.emails,v]}); return;}
+  if(f.dataset.setCode){e.preventDefault(); const c=codeSlug(f.querySelector('input').value); if(c.length<6) return;
+    teamBusy="Saving…"; render();
+    try{ await window.AppleBoxStore.merge("intake/client-"+c,{created:Date.now()},user.email); await window.AppleBoxStore.merge("config/team",{clientCode:c},user.email); teamBusy=""; }
+    catch(err){ console.error(err); teamBusy="Save failed: "+(err.code||err.message); render(); }
+    return;}
 });
 document.addEventListener('change',e=>{
   if(e.target.matches('[data-owner]')){const v=e.target.value.trim(); if(v) owners[e.target.dataset.owner]=v; else delete owners[e.target.dataset.owner]; render(); persist();}
@@ -161,10 +210,42 @@ document.addEventListener('change',e=>{
 });
 render();
 setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not load — check internet / firebase-config.js'; updStatus(); } },8000);
+function stopWatches(){ if(unwatchBoard){unwatchBoard();unwatchBoard=null;} if(unwatchAns){unwatchAns();unwatchAns=null;} }
+function watchAnswers(){
+  if(unwatchAns){unwatchAns();unwatchAns=null;} answers=null; person=null;
+  const p=answersPath(); if(!p){ if(tab==='answers') render(); return; }
+  unwatchAns=window.AppleBoxStore.watch(p,d=>{ answers=d; if(tab==='answers') render(); },err=>console.error(err));
+}
+async function bootstrapTeam(S){
+  // First ever sign-in by the owner: create the team list with this account.
+  if(!BOOTSTRAP.includes((user.email||"").toLowerCase())) return false;
+  try{ await S.merge("config/team",{emails:[user.email.toLowerCase()],clientCode:""},user.email); return true; }catch(e){ console.error("bootstrap",e); return false; }
+}
 document.addEventListener('applebox-store-ready',()=>{
-  const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";render();return;}
-  S.watch("board/state",d=>{ if(pending) return; status=(d&&d.status)||{}; owners=(d&&d.owners)||{}; conn="live"; connMsg=d&&d.updatedBy?`Live · last change by ${d.updatedBy}`:"Live"; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();});
-  S.watch("intake/answers",d=>{ answers=d; if(tab==='answers') render(); });
+  const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";user=null;render();return;}
+  let unwatchTeam=null, lastAnsPath=null;
+  S.onAuth(async u=>{
+    user=u||null; team=null; teamErr=""; stopWatches(); if(unwatchTeam){unwatchTeam();unwatchTeam=null;} lastAnsPath=null;
+    render(); if(!user) return;
+    if(!who&&user.displayName){who=user.displayName;localStorage.setItem('ab-who',who);}
+    const startTeamWatch=()=>{ unwatchTeam=S.watch("config/team",d=>{
+        team=d||{emails:[],clientCode:""}; teamErr="";
+        if(!isTeam()){ stopWatches(); lastAnsPath=null; render(); return; }
+        if(!unwatchBoard){ unwatchBoard=S.watch("board/state",d=>{ if(pending) return; status=(d&&d.status)||{}; owners=(d&&d.owners)||{}; conn="live"; connMsg=d&&d.updatedBy?`Live · last change by ${d.updatedBy}`:"Live"; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();}); }
+        if(answersPath()!==lastAnsPath){ lastAnsPath=answersPath(); watchAnswers(); }
+        render();
+      },async err=>{
+        if(err.code==='permission-denied'){
+          // Either not on the team, or the team list does not exist yet.
+          let existsNow=false;
+          if(BOOTSTRAP.includes((user.email||"").toLowerCase())){ existsNow=await bootstrapTeam(S); }
+          if(existsNow){ if(unwatchTeam) unwatchTeam(); startTeamWatch(); return; }
+          team={emails:[],clientCode:""}; render(); return;
+        }
+        teamErr="Connection error: "+err.code; render();
+      }); };
+    startTeamWatch();
+  });
 });
 </script>
 </body>

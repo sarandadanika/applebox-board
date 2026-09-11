@@ -188,7 +188,7 @@ document.addEventListener('click',e=>{
   const dd=e.target.closest('[data-del]'); if(dd){const k=dd.dataset.del; delArm=null; person=null; conn="saving"; connMsg="Deleting…"; updStatus();
     (k==="_legacy"?window.AppleBoxStore.removeFields(answersPath(),["vals"],who):window.AppleBoxStore.removeFields(answersPath(),["people."+k],who))
       .then(()=>{conn="live";connMsg="Deleted";updStatus();}).catch(err=>{console.error(err);conn="err";connMsg="Delete failed: "+(err.code||err.message);updStatus();}); return;}
-  const f=e.target.closest('.chip'); if(f){filterOwner=f.dataset.f;render();}
+  const f=e.target.closest('.chip[data-f]'); if(f){filterOwner=f.dataset.f;render();}
 });
 async function saveTeam(patch){
   teamBusy="Saving…"; render();

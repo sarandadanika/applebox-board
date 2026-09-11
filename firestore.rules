@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function teamDoc() { return get(/databases/$(db)/documents/config/team).data; }
+    function isTeam() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in teamDoc().emails;
+    }
+    // Team list + client access code. Only team members can read/change it.
+    // The owner accounts may create it the very first time.
+    match /config/team {
+      allow read, update: if isTeam();
+      allow create: if request.auth != null && request.auth.token.email.lower() in
+        ['danika.saranda@gmail.com', 'saranda.danika@gmail.com'];
+      allow delete: if false;
+    }
+    // Board data: team only.
+    //  board/state  legacy status/owners (kept for migration)
+    //  board/meta   stages, nextKey
+    match /board/{docId} {
+      allow read, write: if isTeam();
+    }
+    match /epics/{epicId} {
+      allow read, write: if isTeam();
+    }
+    match /stories/{storyId} {
+      allow read, write: if isTeam();
+    }
+    // Client answers: stored under intake/client-<code>. The code is the key -
+    // documents cannot be listed, so nobody can find them without the code.
+    match /intake/{docId} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.resource.size() < 1048576;
+      allow delete: if isTeam();
+    }
+  }
+}

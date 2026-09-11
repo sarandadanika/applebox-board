@@ -21,104 +21,221 @@
 .who input{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:150px}
 .filters{max-width:1600px;margin:0 auto 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .filters .fl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-right:4px}
-.chip{border:1px solid var(--line);border-radius:14px;padding:5px 11px;font-size:12px;color:var(--ink-2);background:var(--surface);min-height:28px}
+.chip{border:1px solid var(--line);border-radius:14px;padding:5px 11px;font-size:12px;color:var(--ink-2);background:var(--surface);min-height:28px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.board{max-width:1600px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
-.col{background:var(--surface);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
-.col-h{padding:12px 14px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
-.col-h .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.col-h h2{margin:0;font-size:14px;font-weight:600}
-.col-h .eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
-.col-h .count{font-size:12px;color:var(--ink-2)}
-.col-h .bar{height:4px}
-.task{display:grid;grid-template-columns:1fr;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line)}
-.task:last-child{border-bottom:0}
-.task.done .t{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--line)}
-.task-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip:disabled{opacity:.4;cursor:default}
+/* kanban */
+.kanban{max-width:1600px;margin:0 auto;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(280px,1fr);gap:12px;align-items:start;overflow-x:auto;padding-bottom:16px;scroll-snap-type:x proximity}
+.col{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;min-height:200px;scroll-snap-align:start;transition:box-shadow .15s}
+.col.drop{box-shadow:0 0 0 2px var(--accent) inset}
+.col-h{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px 8px;position:sticky;top:0;background:var(--surface-2);border-radius:10px 10px 0 0;z-index:1}
+.col-h h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-2)}
+.col-h .count{font-size:12px;color:var(--ink-3)}
+.col-body{padding:0 8px 8px;display:flex;flex-direction:column;gap:8px;min-height:60px}
+.grp{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.grp-h{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;gap:2px 6px;align-items:center;padding:6px 8px;cursor:grab;user-select:none;-webkit-user-select:none;font-size:12px;font-weight:600;color:var(--ink-2)}
+.grp-h .bar{grid-column:1/-1;height:4px}
+.grp-h .tog{width:22px;height:22px;border-radius:5px;color:var(--ink-3);font-size:12px;background:transparent}
+.grp-h .tog:hover{background:var(--surface-2)}
+.grp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp-n{font-size:11px;color:var(--ink-3);font-weight:500}
+.grp.collapsed .grp-b{display:none}
+.grp-b{display:flex;flex-direction:column;gap:6px;padding:0 6px 6px;min-height:6px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;cursor:grab;touch-action:pan-y;outline:none}
+.card:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.card.dragging{opacity:.35}
+.card-top{display:flex;align-items:center;gap:6px;user-select:none;-webkit-user-select:none}
+.card .t{font-size:13px;line-height:1.35;font-weight:600;user-select:none;-webkit-user-select:none}
+.card-actions{display:flex;gap:10px;flex-wrap:wrap}
 .key{font-size:11px;color:var(--accent);font-weight:500}
 .pri{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--ink-2)}
 .pri.Highest{border-color:var(--accent);color:var(--accent)} .pri.High{border-color:var(--doing);color:var(--doing)}
-.st{width:74px;height:26px;border-radius:13px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--todo-bg);color:var(--ink-2);flex-shrink:0}
-.st svg{width:10px;height:10px}
-.task.doing .st{background:var(--doing-bg);color:var(--doing)}
-.task.done .st{background:var(--done-bg);color:var(--done)}
-.t{font-size:13.5px;line-height:1.4;font-weight:600}
 .oname{font-size:12px;color:var(--ink-2)}
-.more{font-size:12px;color:var(--ink-3);text-decoration:underline;text-underline-offset:2px;align-self:flex-start;min-height:24px}
-.detail{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12.5px;line-height:1.45;padding:8px 10px;background:var(--surface-2);border-radius:6px;margin-top:4px}
+.more{font-size:12px;color:var(--ink-3);text-decoration:underline;text-underline-offset:2px;min-height:22px;background:none;border:0;padding:0;cursor:pointer}
+.detail{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12.5px;line-height:1.45;padding:8px 10px;background:var(--surface-2);border-radius:6px;margin-top:2px;cursor:auto}
 .detail dt{color:var(--ink-3);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding-top:2px}
-.detail dd{margin:0}
-.detail ul{margin:0;padding-left:16px}
-.detail input{width:100%;font:inherit;font-size:12px;color:var(--ink);background:transparent;border:0;border-bottom:1px dashed var(--line);padding:2px 0}
-.task[data-open="0"] .detail{display:none}
-/* answers tab */
+.detail dd{margin:0} .detail ul{margin:0;padding-left:16px}
+.av{--sz:24px;width:var(--sz);height:var(--sz);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:calc(var(--sz)*.42);font-weight:700;background:var(--ink);color:var(--bg);object-fit:cover;flex-shrink:0;letter-spacing:.02em}
+.av.empty{background:transparent;color:var(--ink-3);border:1px dashed var(--line);font-weight:500}
+.av.gone{background:var(--line);color:var(--ink-2)}
+.avbtn{background:none;border:0;padding:0;cursor:pointer;border-radius:50%;display:inline-flex}
+.ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:50;opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.25);transform-origin:top left;cursor:grabbing}
+.ph{border:2px dashed var(--accent);border-radius:7px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+body.dragging-any{cursor:grabbing;user-select:none;-webkit-user-select:none}
+/* modal */
+#modal .overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60}
+#modal .dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(620px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;z-index:61;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+#modal h3{margin:0 0 10px;font-size:16px}
+#modal .hint{margin:0 0 12px;font-size:13px;color:var(--ink-2)}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-3);margin-bottom:10px;flex:1}
+.fld input,.fld select,.fld textarea{font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:100%;box-sizing:border-box}
+.row{display:flex;gap:10px} .row3{display:flex;gap:10px} @media (max-width:560px){.row,.row3{flex-direction:column;gap:0}}
+.actions{display:flex;gap:8px;align-items:center;margin-top:6px}
+.menu{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+/* answers tab + lists */
 .answers{max-width:900px;margin:0 auto}
 .answers section{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.answers section.archived{opacity:.6}
 .answers .sh{padding:10px 16px;border-bottom:1px solid var(--line);font-weight:600;display:flex;justify-content:space-between}
-.answers .sh span{color:var(--ink-3);font-weight:500;font-size:12px}
-.ans{display:grid;grid-template-columns:minmax(200px,2fr) 3fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px}
-.ans:last-child{border-bottom:0}
+.answers .sh span.mono{color:var(--ink-3);font-weight:500;font-size:12px}
+.ans{display:grid;grid-template-columns:minmax(200px,2fr) 3fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;align-items:center}
+.ans:last-child{border-bottom:0} .ans.archived{opacity:.55}
 .ans .q{color:var(--ink-2)} .ans .v{white-space:pre-wrap} .ans .v.empty{color:var(--ink-3);font-style:italic}
 .ans.req .q::after{content:" *";color:var(--accent)}
 .meta{max-width:900px;margin:0 auto 12px;font-size:12px;color:var(--ink-3)}
-@media (max-width:640px){.ans{grid-template-columns:1fr}}
+.tabs{overflow-x:auto;flex-wrap:nowrap} .tab{white-space:nowrap;flex-shrink:0}
+@media (max-width:640px){.ans{grid-template-columns:1fr}.kanban{grid-auto-columns:88vw;gap:10px}.col-h{position:static}.tabs .mono,.tabs span:not(.fl){display:none}}
 </style>
 </head>
 <body>
 <div id="root"></div>
+<div id="modal" hidden></div>
 <script src="firebase-config.js"></script>
 <script type="module" src="store.js"></script>
 <script>
 const PHASES=[{"id":"e1","name":"Agree the basics","owner":"Client (decision maker)","goal":"Before anything is built, the client and the project lead agree on the name, the content, the language and who owns the accounts.","stories":[{"key":"AB-1","title":"Confirm the channel name and handle","owner":"Client (decision maker)","priority":"Highest","as":"the client","want":"to confirm in writing that the channel is called Apple Box and the handle is @appleboxlk on all platforms","so":"the team can register the same name everywhere without going back and forth","details":"The plain handle @applebox is already taken on YouTube, so we use @appleboxlk. The display name people see stays \"Apple Box\".","ac":["Client replies by email or message: \"Apple Box / @appleboxlk approved\".","Handle is written the same way in all documents."]},{"key":"AB-2","title":"Describe the content the channel will make","owner":"Client (decision maker)","priority":"Highest","as":"the client","want":"to explain what kind of programmes we will publish (short movies, news, talk shows, live streams, etc.)","so":"the team designs the brand, the channel layout and the posting plan around real content","details":"Think of it like a TV guide: what shows will exist, how long they are, how often they come out. Share 3 to 5 example channels you like.","ac":["A short written list of show types with a one-line description each.","Links to 3–5 example channels."]},{"key":"AB-3","title":"Decide the languages","owner":"Client (decision maker)","priority":"High","as":"the client","want":"to decide whether content, captions and channel text are in Sinhala, Tamil, English or a mix","so":"bios, descriptions and subtitles are prepared correctly from day one","details":"This affects the channel description, video titles, hashtags and thumbnails.","ac":["Languages chosen for: (1) videos, (2) titles and descriptions, (3) replies to comments."]},{"key":"AB-4","title":"Decide who owns the accounts","owner":"Client (decision maker)","priority":"Highest","as":"the client","want":"all channels to be created under a company email address that belongs to the business, not to one person","so":"the channel is never lost if a staff member leaves or a personal phone is lost","details":"The project lead will create the accounts but the client company keeps ownership. The client names who will have admin access.","ac":["Company email address provided (or agreed to create one).","List of people who get admin access."]},{"key":"AB-5","title":"Agree what each side delivers","owner":"Project lead (Danika)","priority":"High","as":"the project lead","want":"a simple written agreement on what I deliver and what the client provides","so":"there are no surprises about videos, scripts, tools or advertising budget","details":"Example: the team sets up channels, brand and posting system; the client provides finished videos, actors' permissions and any ad budget.","ac":["One-page scope note sent to and accepted by the client."]}]},{"id":"e2","name":"Brand kit","owner":"Designer","goal":"Everything that makes Apple Box look like one channel everywhere: logo, banners, intro animation and templates.","stories":[{"key":"AB-6","title":"Choose the final logo","owner":"Client (decision maker)","priority":"Highest","as":"the client","want":"to pick one of the four logo options (or ask for a change)","so":"the designer can produce the final files","details":"Options: A Crate, B Open Box with play button, C AB Cube, D Wordmark. None use an apple fruit, to avoid problems with Apple Inc.","ac":["One option chosen, with any colour or text changes noted."]},{"key":"AB-7","title":"Produce the logo files","owner":"Designer","priority":"High","as":"the designer","want":"to deliver the logo in every size and colour the platforms need","so":"the same logo can be used on YouTube, Facebook, Instagram, TikTok and in videos","details":"Needed: square profile picture, horizontal logo, white version, black version. Formats: PNG (for uploading) and SVG (for printing and video).","ac":["Files delivered in a shared folder named Brand / Logo.","Profile picture looks clear at small size (test at 48 px)."]},{"key":"AB-8","title":"Design the channel banners","owner":"Designer","priority":"High","as":"the designer","want":"to design the large header images for YouTube and Facebook","so":"the channel pages look professional from the first visit","details":"YouTube banner: 2560 × 1440 px (keep the important part in the centre 1546 × 423 px, because phones crop it). Facebook cover: 820 × 312 px. TikTok and Instagram only use the profile picture.","ac":["YouTube and Facebook banners delivered and checked on a phone and a computer."]},{"key":"AB-9","title":"Create the animated logo intro and outro","owner":"Video editor","priority":"Medium","as":"the video editor","want":"a 3–5 second animated logo to put at the start of every video, and an end-screen design","so":"every video is recognisable as Apple Box","details":"A ready-made prompt for AI video tools is available from the project lead. The end screen needs space for \"next video\" and \"subscribe\" buttons.","ac":["Intro delivered as MP4 (1920×1080 and 1080×1080).","Outro template delivered with 20 seconds of space for YouTube end-screen elements."]},{"key":"AB-10","title":"Create thumbnail and title templates","owner":"Designer","priority":"Medium","as":"the designer","want":"a reusable thumbnail design (1280 × 720 px) and an on-screen title style","so":"the editor can make new thumbnails quickly and they all look like one channel","details":"The template should have a place for a big title (max 4–5 words), a photo, and the Apple Box logo.","ac":["Editable template (Canva, Photoshop or Figma) shared with the editor.","Two example thumbnails made from it."]},{"key":"AB-11","title":"Write a one-page brand guide","owner":"Designer","priority":"Low","as":"the designer","want":"a single page showing the colours, fonts, logo rules and tone of voice","so":"anyone who joins later makes things that match","details":"Keep it simple: colour codes, font names, \"do and don't\" logo examples, and three words that describe how Apple Box speaks.","ac":["PDF shared in the Brand folder."]}]},{"id":"e3","name":"Account setup","owner":"Project lead (Danika)","goal":"Create and secure the four channels and connect them to each other.","stories":[{"key":"AB-12","title":"Create a shared company Google account","owner":"Project lead (Danika)","priority":"Highest","as":"the project lead","want":"to create one Google account for Apple Box (for example applebox.media@gmail.com) with security switched on","so":"YouTube and the other tools have one safe home that the company owns","details":"Security = 2-step verification (a code on a phone when signing in), plus a recovery phone number and a recovery email belonging to the client.","ac":["Account created with 2-step verification on.","Recovery phone and email set to the client's details."]},{"key":"AB-13","title":"Store all logins in a shared password manager","owner":"Project lead (Danika)","priority":"High","as":"the project lead","want":"every channel login kept in a password manager shared with the client","so":"no password is on a piece of paper or in a chat, and the client can always get in","details":"Free options: Bitwarden or 1Password family plan. Also store the 2-step backup codes.","ac":["All four platform logins plus the Google account saved.","Client has confirmed they can open the vault."]},{"key":"AB-14","title":"Set up the YouTube channel","owner":"Project lead (Danika)","priority":"Highest","as":"the project lead","want":"the YouTube channel fully set up and verified","so":"we can upload long videos, use custom thumbnails, and go live","details":"Includes: handle @appleboxlk, logo, banner, description, links, a short channel trailer, and phone verification. Live streaming is switched on 24 hours after it is requested, so do this early.","ac":["Channel page complete (logo, banner, description, links).","Account verified; custom thumbnails, long uploads and live streaming available.","Shorts and Premieres tested once."]},{"key":"AB-15","title":"Set up the Facebook Page","owner":"Project lead (Danika)","priority":"High","as":"the project lead","want":"a Facebook Page for Apple Box with the right category and full details","so":"Facebook shows us as a media channel and lets us post Reels and videos","details":"Category: \"Media/News Company\" or \"TV Channel\". Fill in About, website/links, email. Turn on Reels.","ac":["Page published with logo, cover, About text and links.","At least two people from the client side added as admins."]},{"key":"AB-16","title":"Set up the Instagram account","owner":"Project lead (Danika)","priority":"High","as":"the project lead","want":"an Instagram professional account connected to the Facebook Page","so":"posts, Reels and messages can be managed together with Facebook","details":"Choose \"Creator\" or \"Business\" account type. Connect it to the Page in Meta Business Suite.","ac":["Account created, bio and logo added.","Connected to the Facebook Page (visible in Meta Business Suite)."]},{"key":"AB-17","title":"Set up the TikTok account","owner":"Project lead (Danika)","priority":"High","as":"the project lead","want":"a TikTok Business account with links to our other channels","so":"short clips reach a younger audience and send people to YouTube","details":"Switch to Business account in settings so we get statistics and can add a website link. Add the YouTube and Instagram links in the profile.","ac":["Business account active; logo, bio and links added."]},{"key":"AB-18","title":"Connect Facebook and Instagram in Meta Business Suite","owner":"Social media manager","priority":"Medium","as":"the social media manager","want":"to manage Facebook and Instagram from one screen","so":"one post can go to both and all messages and comments arrive in one inbox","details":"Meta Business Suite is free. It also lets us schedule posts in advance.","ac":["Both accounts visible in Business Suite.","One test post published to both from Business Suite."]},{"key":"AB-19","title":"Link all four profiles to each other","owner":"Social media manager","priority":"Medium","as":"the social media manager","want":"each profile to show links to the other three","so":"a viewer who finds us on one platform can follow us everywhere","details":"YouTube: Customisation → Links. Facebook: About → Websites and social links. Instagram and TikTok: the link field in the profile.","ac":["Every profile has links to the other three, checked by clicking each one."]},{"key":"AB-20","title":"Write the bios and pin a welcome post","owner":"Social media manager","priority":"Medium","as":"the social media manager","want":"the same short introduction text on every platform and a pinned \"Welcome to Apple Box\" post","so":"new visitors immediately understand what the channel is","details":"Bio: one sentence about what we publish, one about when (\"New short movie every Friday\"), and a link. Adjust length per platform (Instagram 150 characters, TikTok 80).","ac":["Bios live on all four platforms in the agreed languages.","Welcome post pinned on YouTube (community post or trailer), Facebook, Instagram and TikTok."]}]},{"id":"e4","name":"Content system","owner":"Content / video team","goal":"A simple routine so the channel publishes regularly, like a TV schedule.","stories":[{"key":"AB-21","title":"Define the shows and a fixed schedule","owner":"Client (decision maker)","priority":"Highest","as":"the client","want":"to decide the programme list and when each show is released","so":"viewers know when to come back, just like a TV timetable","details":"Example: short movie every Friday evening, one short clip every day, a behind-the-scenes post on Sundays. Fewer shows done regularly beat many shows done sometimes.","ac":["Written schedule: show name, format, length, release day and time."]},{"key":"AB-22","title":"Set up the content calendar","owner":"Social media manager","priority":"High","as":"the social media manager","want":"a shared calendar (Google Sheet or Notion) listing every planned post","so":"everyone can see what is coming and nothing is forgotten","details":"Columns: date, platform, title, format (movie / short clip / poster), status (idea, filming, editing, ready, published), owner.","ac":["Calendar created and shared with the client and team.","First month filled in."]},{"key":"AB-23","title":"Create the shared folder structure","owner":"Project lead (Danika)","priority":"High","as":"the project lead","want":"one shared Google Drive with clear folders","so":"files are easy to find and nothing is lost on someone's laptop","details":"Folders: 01 Raw footage / 02 Edited / 03 Thumbnails / 04 Published / Brand.","ac":["Drive created under the company account and shared with the team."]},{"key":"AB-24","title":"Create YouTube playlists for each show","owner":"Social media manager","priority":"Low","as":"the social media manager","want":"a playlist per show or series","so":"viewers can watch a whole series in order and the channel page looks organised","details":"Add playlists to the channel home page sections.","ac":["One playlist per show, shown on the channel home page."]},{"key":"AB-25","title":"Prepare 5–10 pieces of content before launch","owner":"Content / video team","priority":"Highest","as":"the content team","want":"a stock of finished videos and clips ready before the channel goes public","so":"the first weeks are not empty and the schedule can be kept","details":"For example: channel trailer, 2 short movies, 5 short vertical clips, 3 poster images.","ac":["Finished files uploaded to 04 Published folder with titles and descriptions."]},{"key":"AB-26","title":"Write the standard descriptions and hashtags","owner":"Social media manager","priority":"Medium","as":"the social media manager","want":"a ready text template for each platform","so":"every post has the right links, hashtags and credits without retyping","details":"YouTube description: summary, credits, links to all channels, copyright line. Instagram/TikTok: short caption plus 5–10 hashtags. Facebook: short text plus link.","ac":["Template document saved in the Brand folder."]},{"key":"AB-27","title":"Define the repurposing flow","owner":"Video editor","priority":"High","as":"the video editor","want":"a fixed list of what to cut from every short movie","so":"one film becomes a week of content on all platforms","details":"From each movie: a 30–60 s trailer (YouTube Shorts, Reels, TikTok), 2–3 vertical clips of the best moments, a poster image and 3 still photos for Facebook and Instagram.","ac":["Checklist written and used for the first movie."]},{"key":"AB-28","title":"Choose and connect a scheduling tool","owner":"Social media manager","priority":"Medium","as":"the social media manager","want":"one tool where posts for all four platforms can be scheduled in advance","so":"posts go out on time even on weekends and holidays","details":"Metricool or Buffer (free plans are enough to start). Connect all four accounts.","ac":["Tool connected to all four accounts; one scheduled test post delivered correctly."]}]},{"id":"e5","name":"Legal and monetisation","owner":"Client (decision maker)","goal":"Protect the channel from copyright problems and prepare to earn money.","stories":[{"key":"AB-29","title":"Confirm rights to music, footage and actors","owner":"Client (decision maker)","priority":"Highest","as":"the client","want":"to confirm we have permission for all music, video clips and people appearing in our movies","so":"the channel does not receive copyright strikes, which can remove videos or close the channel","details":"Each actor signs a simple release form. Music must be original, licensed, or royalty-free. Keep copies of licences in the Drive.","ac":["Signed release forms for all actors in the first movies.","Music source recorded for every film."]},{"key":"AB-30","title":"Use only licensed or royalty-free music","owner":"Video editor","priority":"High","as":"the video editor","want":"a trusted list of music sources","so":"no video is muted or claimed by a music company","details":"Free: YouTube Audio Library. Paid: Epidemic Sound, Artlist. Never use songs from Spotify or films.","ac":["Music source list saved in the Brand folder and followed on every edit."]},{"key":"AB-31","title":"Add a copyright notice and contact email","owner":"Social media manager","priority":"Low","as":"the social media manager","want":"a copyright line and a business contact email on every channel","so":"our own work is protected and sponsors can reach us","details":"Example: \"© Apple Box. All rights reserved. Business enquiries: hello@…\"","ac":["Present in the YouTube About section and all bios."]},{"key":"AB-32","title":"Prepare for monetisation","owner":"Project lead (Danika)","priority":"Medium","as":"the project lead","want":"to know the earning rules of each platform and make sure payments go to the client","so":"the client is ready to apply as soon as the channel qualifies","details":"YouTube Partner Program needs 1,000 subscribers and 4,000 public watch hours in 12 months, or 10 million Shorts views in 90 days. Facebook and TikTok have their own rules. The AdSense (payment) account must be in the client's name.","ac":["One-page note of the rules shared with the client.","Client's AdSense account planned (name, bank, tax details)."]}]},{"id":"e6","name":"Launch","owner":"Social media manager","goal":"Open the channel to the public with enough content and a push in the first days.","stories":[{"key":"AB-33","title":"Soft launch","owner":"Social media manager","priority":"High","as":"the social media manager","want":"to publish the channel trailer and the first three videos quietly","so":"we can check everything works before we tell the world","details":"Check: thumbnails, titles, descriptions, links, playback on phone.","ac":["Trailer and three videos live on YouTube; issues fixed."]},{"key":"AB-34","title":"Launch day on all platforms","owner":"Social media manager","priority":"Highest","as":"the social media manager","want":"a launch post on all four platforms on the same day, with a YouTube Premiere for the first short movie","so":"the first movie gets attention on every platform at once","details":"A Premiere shows the movie at a set time with a live chat, like a TV première.","ac":["Launch posts published on all four platforms.","Premiere scheduled and announced at least 3 days before."]},{"key":"AB-35","title":"Ask the team, cast and friends to share","owner":"Client (decision maker)","priority":"High","as":"the client","want":"everyone connected to the project to subscribe and share in the first 48 hours","so":"the platforms see early activity and show the channel to more people","details":"Send a short message with the four links and one sentence to copy-paste.","ac":["Message sent to the cast, crew and company staff."]},{"key":"AB-36","title":"Run a small boosted post","owner":"Social media manager","priority":"Low","as":"the social media manager","want":"to spend a small budget promoting the launch post to people in Sri Lanka","so":"the launch reaches beyond our own contacts","details":"Even LKR 5,000–10,000 on Facebook/Instagram helps. Target: Sri Lanka, age and interests matching the content.","ac":["Budget approved by the client; boosted post running for the launch week."]}]},{"id":"e7","name":"Running the channel","owner":"Social media manager","goal":"The weekly routine that keeps the channel growing.","stories":[{"key":"AB-37","title":"Post on schedule and reply to comments","owner":"Social media manager","priority":"High","as":"the social media manager","want":"to publish on the agreed days and reply to comments within the first hour after each upload","so":"viewers feel heard and the platforms promote our videos more","details":"The first hour after upload matters most for reach.","ac":["Schedule kept each week; comments answered on every new upload."]},{"key":"AB-38","title":"Weekly performance check","owner":"Social media manager","priority":"Medium","as":"the social media manager","want":"to look at YouTube Studio and Meta Insights once a week","so":"we learn what viewers like and make more of it","details":"Look at: views, watch time, which clips did best, where viewers stopped watching.","ac":["Short weekly note (5 lines) added to the content calendar."]},{"key":"AB-39","title":"Monthly report to the client","owner":"Project lead (Danika)","priority":"Medium","as":"the project lead","want":"a simple monthly summary for the client","so":"the client sees progress and can decide next steps","details":"Followers per platform, total views, top three videos, next month's plan. One page.","ac":["Report sent in the first week of each month."]},{"key":"AB-40","title":"Keep backups of logins and brand files","owner":"Project lead (Danika)","priority":"Medium","as":"the project lead","want":"the passwords, 2-step backup codes and brand files kept safe in two places","so":"the channel can be recovered even if a phone or laptop is lost","details":"Password manager plus a sealed copy held by the client.","ac":["Backup confirmed by the client."]}]}];
 const SECTIONS=[{"name":"Channel identity","why":"Used on every profile — must be final before anything is created.","items":[{"id":"name_ok","t":"Channel name and handle","k":"choice","o":["Keep “Apple Box” with @appleboxlk","Keep “Apple Box”, but I prefer a different handle","Change the channel name"],"req":1,"h":"The channel name is what viewers see (“Apple Box”). The handle is the @username in the link. We checked: @applebox is already taken on YouTube, so it cannot be used. Our suggestion is @appleboxlk — the same on YouTube, Facebook, Instagram and TikTok."},{"id":"handle_alt","t":"If you chose a different handle or a new name, write 2–3 options in order of preference","k":"textarea","h":"Examples: @appleboxmedia, @appleboxtv, @appleboxfilms. We will check which ones are free on all four platforms and confirm with you before creating anything."},{"id":"tagline","t":"One-line tagline (optional)","k":"text","h":"Shown under the name in bios. Example: “Short films and shows from Sri Lanka.”"},{"id":"logo","t":"Logo — do you already have one?","k":"choice","o":["Yes — we will send the files","We have a rough idea or sketch","No — please design one for us"],"req":1,"h":"If you have a logo, please send the original files (AI, SVG, PDF or the largest PNG you have). If not, we will prepare options for you to choose from."},{"id":"logo_notes","t":"Logo brief: colours, style, and anything to include or avoid","k":"textarea","req":1,"h":"Example: “Red and black, modern, should feel like a film studio. No apple fruit.” If you already have a logo, tell us the exact colour codes if you know them."},{"id":"logo_send","t":"How will you send the logo files?","k":"text","h":"Google Drive link, WeTransfer, WhatsApp or email — and to whom."},{"id":"lang","t":"Languages","k":"multi","o":["Sinhala","Tamil","English"],"req":1,"h":"Tick all that apply. This decides bios, titles, captions and subtitles."},{"id":"lang_main","t":"Main language for titles and descriptions","k":"choice","o":["Sinhala","Tamil","English"],"req":1}]},{"name":"Company details","why":"Needed to fill the About sections and to keep account ownership with the company.","items":[{"id":"company","t":"Legal company / business name","k":"text","req":1,"h":"Exactly as on the business registration. Used for copyright line and monetisation."},{"id":"reg_no","t":"Business registration number (if registered)","k":"text","h":"Needed later for YouTube monetisation and TikTok Business verification."},{"id":"address","t":"Business address","k":"textarea","req":1,"h":"Shown on the Facebook Page (can be hidden) and used for AdSense later."},{"id":"website","t":"Website (if any)","k":"text","h":"Leave empty if none — we can link to YouTube instead."},{"id":"existing","t":"Any existing social media accounts or pages for this business?","k":"textarea","h":"Give links. We may reuse or merge them instead of creating new ones."}]},{"name":"Business email and phone","why":"Every platform needs an email and a mobile number for sign-up, security codes and recovery. These decide who really controls the channel.","items":[{"id":"email_have","t":"Do you already have a business email for Apple Box?","k":"choice","o":["Yes — details below","No — please create one"],"req":1},{"id":"email_existing","t":"If yes: the email address","k":"text","h":"We will need a way to sign in to it, or you can create the accounts with us on a call."},{"id":"email_new","t":"If no: preferred new email name","k":"text","h":"Example: applebox.media@gmail.com or applebox.lk@gmail.com. We will check what is free."},{"id":"recovery_email","t":"Recovery email (a second address owned by the company or director)","k":"text","req":1,"h":"Used to get back in if the password is lost. Must NOT be the same as the main email."},{"id":"mobile","t":"Business mobile number for security codes (2-step verification)","k":"text","req":1,"h":"This phone receives login codes from Google, Facebook, Instagram and TikTok. It should be a company phone or the director's phone, not a staff member's personal phone."},{"id":"mobile_owner","t":"Whose phone is this, and is it available during the setup?","k":"text","req":1,"h":"We will need them to read out codes 4–6 times during setup."},{"id":"mobile2","t":"Backup mobile number (optional but recommended)","k":"text"},{"id":"contact_email","t":"Public contact email for business enquiries","k":"text","req":1,"h":"Shown publicly on YouTube About and in bios. Can be the same as the business email."},{"id":"whatsapp","t":"WhatsApp number for the Facebook Page button (optional)","k":"text","h":"Facebook can show a “WhatsApp” button so viewers can message you."}]},{"name":"Who has access","why":"Platforms ask for named people. Owners can remove everyone else, so choose carefully.","items":[{"id":"owner_person","t":"Account owner (one person, usually the director)","k":"text","req":1,"h":"Name, personal email, mobile. This person is the final owner on all platforms."},{"id":"owner_dob","t":"Owner’s date of birth","k":"text","req":1,"h":"Google and TikTok ask for this at sign-up. The owner must be 18 or older."},{"id":"admins","t":"Other people who need admin access","k":"textarea","h":"Name, email and role for each. Example: “Nimal — nimal@… — posts videos”."},{"id":"facebook_profiles","t":"Personal Facebook profiles of the admins","k":"textarea","req":1,"h":"A Facebook Page can only be created and managed from a personal Facebook account. Please give the profile names or links of the owner and 1–2 admins. These are never shown to the public — viewers only see the Apple Box Page. Important: do not create a new “fake” personal account just for this. Facebook disables such accounts quickly, and if it was the only admin the Page is lost. We will also put the Page inside a company Meta Business Portfolio so it belongs to the business, not to one person."},{"id":"pm_access","t":"Confirm the project lead (Danika) can have admin access during setup","k":"choice","o":["Yes","Only with someone present"],"req":1},{"id":"pwmanager","t":"Password manager: OK to store all logins in a shared vault (Bitwarden / 1Password)?","k":"choice","o":["Yes","We prefer another way"],"req":1}]},{"name":"Content and schedule","why":"Bios, playlists, thumbnails and the posting plan are built from this.","items":[{"id":"formats","t":"Content types","k":"multi","o":["Short movies","Web series","News / current affairs","Talk show / interviews","Live streams","Music","Comedy sketches","Behind the scenes","Other"],"req":1},{"id":"audience","t":"Who is the audience?","k":"textarea","req":1,"h":"Age range, location (Sri Lanka only or also overseas Sri Lankans), interests."},{"id":"kids","t":"Is any content made for children (under 13)?","k":"choice","o":["No","Yes","Some"],"req":1,"h":"YouTube legally requires this setting on every video. Wrong answers can get videos removed."},{"id":"examples","t":"3–5 channels you like the look of","k":"textarea","h":"Links. Tell us what you like about each."},{"id":"category","t":"Facebook Page category","k":"choice","o":["TV Channel","Media/News Company","Movie / Film","Entertainment website"],"req":1}]},{"name":"Rights, credits and legal","why":"Copyright problems are the number one reason new channels get removed.","items":[{"id":"credits","t":"Standard credits to show on every video","k":"textarea","h":"Production company, director, main cast, “Produced by …”."},{"id":"copyright_line","t":"Copyright notice text","k":"text","h":"Example: “© 2026 Apple Box Productions (Pvt) Ltd. All rights reserved.”"},{"id":"trademark","t":"Is the name Apple Box registered as a trademark or business name?","k":"choice","o":["Yes","No","In progress"]}]},{"name":"Money and tools","why":"Small paid tools make the channel look professional; earning later needs the right names on the accounts.","items":[{"id":"monetise_name","t":"Whose name will the AdSense / payment account be in?","k":"text","req":1,"h":"Company or a director. This cannot easily be changed later."},{"id":"ad_budget","t":"Budget for launch promotion (boosted posts)","k":"choice","o":["None","LKR 5,000–10,000","LKR 10,000–25,000","More"],"req":1}]},{"name":"Brand assets you can send","why":"Anything that already exists saves design time and keeps things consistent.","items":[{"id":"assets","t":"Existing brand files","k":"multi","o":["Logo files","Brand colours","Fonts","Photos of the team / studio","Film posters / stills","None yet"]},{"id":"assets_where","t":"Where can we collect them?","k":"text","h":"Shared Drive link, WeTransfer, or “will email”."},{"id":"bio_facts","t":"Three facts about Apple Box for the About section","k":"textarea","req":1,"h":"Example: when it started, who is behind it, what makes it different."},{"id":"launch_target","t":"Anything else we should know?","k":"textarea"}]}];
-const ORDER=["todo","doing","done"], LABEL={todo:"To do",doing:"Doing",done:"Done"};
+/* ===================== Apple Box Launch Board — app script =====================
+   Data lives in Firestore:
+     board/meta        { stages:[{id,name}], nextKey }
+     epics/{id}        { name, goal, role, order, archived }
+     stories/{id}      { key, epicId, title, priority, role, assignee:{email,name}|null,
+                         stage, order, as, want, so, details, ac:[], archived }
+     config/team       { emails:[], clientCode, profiles:{ "a,b@gmail,com":{name,photo} } }
+   PHASES (above) is only the seed used by "Import default epics & stories".
+   ============================================================================== */
+const PRIORITIES=["Highest","High","Medium","Low"];
+const DEFAULT_STAGES=[{id:"backlog",name:"Backlog"},{id:"todo",name:"To do"},{id:"doing",name:"Doing"},{id:"review",name:"Review"},{id:"done",name:"Done"}];
 const ICON={todo:'<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
  doing:'<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 1.5A3.5 3.5 0 0 1 5 8.5Z" fill="currentColor"/></svg>',
  done:'<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="currentColor"/><path d="M3 5.2l1.4 1.4L7.2 3.8" fill="none" stroke="var(--done-bg)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'};
 const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"><polygon points="40,62 100,34 100,70 40,98" fill="#b8241c"/><polygon points="160,62 100,34 100,70 160,98" fill="#ff5a4a"/><rect x="40" y="62" width="120" height="108" rx="10" fill="#e6332a"/><polygon points="84,88 84,144 132,116" fill="#fff"/></svg>';
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cmp=(a,b)=>a<b?-1:a>b?1:0;
+const byOrder=(a,b)=>cmp(a.order||"",b.order||"")||cmp(a.key||"",b.key||"");
+const emailKey=e=>String(e||"").toLowerCase().replace(/\./g,",");   // Firestore field names cannot contain "."
+const initials=n=>String(n||"?").split(/[\s@._-]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("")||"?";
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
-let status={}, owners={}, answers=null, answersMeta="", person=null, delArm=null;
-let tab=localStorage.getItem("ab-tab")||"board", filterOwner="all", openSet=new Set();
+/* ---- fractional ordering keys --------------------------------------------------
+   Keys are lowercase base-36 strings compared as plain strings. between(a,b) returns a
+   key strictly between a and b ("" = open end). Only the moved card is ever rewritten. */
+const AL="0123456789abcdefghijklmnopqrstuvwxyz";
+function between(a,b){
+  a=a||""; b=b||""; let res="", i=0;
+  for(;;){
+    const ca=i<a.length?AL.indexOf(a[i]):0;
+    const cb=b!==""&&i<b.length?AL.indexOf(b[i]):36;
+    if(cb-ca>1){ return res+AL[Math.floor((ca+cb)/2)]; }
+    res+=AL[ca];
+    if(cb===ca+1) b="";        // from here on only the lower bound matters
+    i++;
+  }
+}
+function seedKeys(n){ const step=Math.floor(46655/(n+1)); return Array.from({length:n},(_,i)=>((i+1)*step).toString(36).padStart(3,"0")); }
+
+/* ---- state ------------------------------------------------------------------- */
+let user=undefined, team=null, teamErr="", authMsg="", teamBusy="";
+let meta=null, epics=null, stories=null;          // null = not loaded yet
+let answers=null, person=null, delArm=null;
+let tab=localStorage.getItem("ab-tab")||"board", filterA=localStorage.getItem("ab-filter")||"all";
 let who=localStorage.getItem("ab-who")||"", conn="off", connMsg="Connecting…";
-let user=undefined, team=null, teamErr="", authMsg="", unwatchBoard=null, unwatchAns=null, teamOpen=false, teamBusy="";
-const BOOTSTRAP=["danika.saranda@gmail.com","saranda.danika@gmail.com"]; // may create the team list the first time
+let openSet=new Set(), collapsed=new Set(JSON.parse(localStorage.getItem("ab-collapsed")||"[]")), showArchived=false;
+let drag=null;                                   // active drag, see startDrag()
+const BOOTSTRAP=["danika.saranda@gmail.com","saranda.danika@gmail.com"];
 const codeSlug=c=>String(c||"").trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
 const answersPath=()=>team&&codeSlug(team.clientCode)?"intake/client-"+codeSlug(team.clientCode):null;
 const isTeam=()=>!!(user&&team&&Array.isArray(team.emails)&&team.emails.map(e=>e.toLowerCase()).includes((user.email||"").toLowerCase()));
-const OWNER_LIST=[...new Set(PHASES.flatMap(p=>p.stories.map(s=>s.owner)))];
-const counts=list=>{const c={todo:0,doing:0,done:0};list.forEach(s=>c[s]++);return c;};
-const barHTML=(c,total)=>`<div class="bar"><i class="d" style="width:${total?c.done/total*100:0}%"></i><i class="p" style="width:${total?c.doing/total*100:0}%"></i></div>`;
+const S=()=>window.AppleBoxStore;
+
+const stages=()=>(meta&&Array.isArray(meta.stages)&&meta.stages.length?meta.stages:DEFAULT_STAGES);
+const stageIdx=id=>Math.max(0,stages().findIndex(s=>s.id===id));
+const stageName=id=>(stages().find(s=>s.id===id)||{}).name||id;
+const liveEpics=()=>Object.values(epics||{}).filter(e=>!e.archived).sort(byOrder);
+const liveStories=()=>Object.values(stories||{}).filter(s=>!s.archived);
+const epicStories=eid=>liveStories().filter(s=>s.epicId===eid).sort(byOrder);
+const epicStage=eid=>{ const ss=epicStories(eid); if(!ss.length) return null; return stages()[Math.min(...ss.map(s=>stageIdx(s.stage)))].id; };
+const members=()=>{ const prof=(team&&team.profiles)||{}; return ((team&&team.emails)||[]).map(e=>{const p=prof[emailKey(e)]||{}; return {email:e.toLowerCase(),name:p.name||e.split("@")[0],photo:p.photo||""};}); };
+const memberOf=email=>members().find(m=>m.email===(email||"").toLowerCase());
+const doneId=()=>stages()[stages().length-1].id;
+
+function persistCollapsed(){ localStorage.setItem("ab-collapsed",JSON.stringify([...collapsed])); }
+function updStatus(){const el=document.querySelector('.status'); if(el){el.className='status '+conn; el.innerHTML='<i></i>'+esc(connMsg);}}
+function setConn(c,m){conn=c;connMsg=m;updStatus();}
+function fail(e,what){ console.error(what,e); setConn("err",(what||"Save failed")+": "+(e.code||e.message)); }
+
+/* ---- rendering helpers ------------------------------------------------------- */
+function avatarHTML(a,size){ if(!a) return `<span class="av empty" title="Unassigned" style="--sz:${size||24}px">+</span>`;
+  const m=memberOf(a.email); const gone=!m; const name=(m&&m.name)||a.name||a.email;
+  return m&&m.photo?`<img class="av" src="${esc(m.photo)}" alt="" title="${esc(name)}" style="--sz:${size||24}px" referrerpolicy="no-referrer">`
+    :`<span class="av ${gone?'gone':''}" title="${esc(name)}${gone?' (no longer on team)':''}" style="--sz:${size||24}px">${esc(initials(name))}</span>`; }
+const barHTML=(done,doing,total)=>`<div class="bar"><i class="d" style="width:${total?done/total*100:0}%"></i><i class="p" style="width:${total?doing/total*100:0}%"></i></div>`;
+function progress(list){ const d=doneId(); const done=list.filter(s=>s.stage===d).length; const doing=list.filter(s=>s.stage!==d&&s.stage!=="backlog"&&s.stage!=="todo").length; return {done,doing,total:list.length}; }
 
 function header(){
-  const all=[];PHASES.forEach(p=>p.stories.forEach(s=>all.push(status[s.key]||'todo')));
-  const c=counts(all), total=all.length;
+  const all=liveStories(); const p=progress(all);
   return `<header class="top">
     <div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">Internal · YouTube, Facebook, Instagram, TikTok setup · @appleboxlk</p></div></div>
     <div class="summary">
-      <div class="meter"><div class="meter-label"><span>Overall</span><b class="mono">${c.done} / ${total} done</b></div>${barHTML(c,total)}
-      <div class="legend"><span class="ld">Done ${c.done}</span><span class="lp">Doing ${c.doing}</span><span class="lt">To do ${c.todo}</span></div></div>
+      <div class="meter"><div class="meter-label"><span>Overall</span><b class="mono">${p.done} / ${p.total} done</b></div>${barHTML(p.done,p.doing,p.total)}
+      <div class="legend"><span class="ld">Done ${p.done}</span><span class="lp">In progress ${p.doing}</span><span class="lt">Not started ${p.total-p.done-p.doing}</span></div></div>
       <div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="e.g. Danika"></div>
       <div class="status ${conn}"><i></i>${esc(connMsg)}</div>
     </div></header>
-    ${window.AppleBoxStore&&!window.AppleBoxStore.configured?`<div class="banner">Not connected yet — open <code>firebase-config.js</code> and paste your Firebase settings (see README). Until then, changes are not saved.</div>`:''}
-    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Task board</button><button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
+    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Board</button><button class="tab ${tab==='epics'?'on':''}" data-tab="epics">Epics</button><button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
+}
+function importBanner(){
+  if(epics===null||stories===null) return `<div class="banner">Loading board…</div>`;
+  if(Object.keys(epics).length) return "";
+  return `<div class="banner" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span>The board is empty. Import the 40 default stories (your existing To do / Doing / Done marks are kept).</span><button class="chip" data-import="1" style="background:var(--ink);color:var(--bg);border-color:var(--ink)">Import default epics &amp; stories</button></div>`;
+}
+function filtersHTML(){
+  const me=(user.email||"").toLowerCase();
+  const chip=(id,label,extra)=>`<button class="chip ${filterA===id?'on':''}" data-f="${esc(id)}">${extra||''}${esc(label)}</button>`;
+  return `<div class="filters"><span class="fl">Show</span>${chip("all","Everyone")}${chip("me","Me")}${chip("none","Unassigned")}${members().filter(m=>m.email!==me).map(m=>chip(m.email,m.name,avatarHTML({email:m.email},18)+' ')).join('')}<span style="flex:1"></span><button class="chip" data-new-story="">+ Story</button><button class="chip" data-new-epic="1">+ Epic</button></div>`;
+}
+const visible=s=>filterA==="all"||(filterA==="none"?!s.assignee:filterA==="me"?(s.assignee&&s.assignee.email===(user.email||"").toLowerCase()):(s.assignee&&s.assignee.email===filterA));
+
+function cardHTML(s){
+  const open=openSet.has(s.id);
+  return `<article class="card ${open?'open':''}" data-card="${esc(s.id)}" tabindex="0" aria-label="${esc(s.key)} ${esc(s.title)}">
+    <div class="card-top"><span class="key mono">${esc(s.key)}</span><span class="pri ${esc(s.priority)}">${esc(s.priority)}</span><span style="flex:1"></span>
+      <button class="avbtn" data-assign="${esc(s.id)}" title="Assign">${avatarHTML(s.assignee,24)}</button></div>
+    <div class="t">${esc(s.title)}</div>
+    ${s.role&&!s.assignee?`<div class="oname">Role: ${esc(s.role)}</div>`:''}
+    <div class="card-actions"><button class="more" data-more="${esc(s.id)}">${open?'Hide story':'Show story'}</button><button class="more" data-move="${esc(s.id)}">Move to…</button><button class="more" data-edit-story="${esc(s.id)}">Edit</button></div>
+    ${open?`<dl class="detail"><dt>Story</dt><dd>As <b>${esc(s.as)}</b>, I want ${esc(s.want)}, so that ${esc(s.so)}.</dd>
+      <dt>Details</dt><dd>${esc(s.details)}</dd><dt>Done when</dt><dd><ul>${(s.ac||[]).map(a=>`<li>${esc(a)}</li>`).join('')}</ul></dd>
+      ${s.role?`<dt>Role</dt><dd>${esc(s.role)}</dd>`:''}${s.updatedBy?`<dt>Updated</dt><dd>${esc(s.updatedBy)}</dd>`:''}</dl>`:''}
+  </article>`;
 }
 function boardHTML(){
-  let h=`<div class="filters"><span class="fl">Show</span><button class="chip ${filterOwner==='all'?'on':''}" data-f="all">Everyone</button>${OWNER_LIST.map(o=>`<button class="chip ${filterOwner===o?'on':''}" data-f="${esc(o)}">${esc(o)}</button>`).join('')}</div><main class="board">`;
-  PHASES.forEach((p,pi)=>{
-    const vis=p.stories.filter(s=>filterOwner==='all'||(owners[s.key]||s.owner)===filterOwner); if(!vis.length) return;
-    const list=p.stories.map(s=>status[s.key]||'todo'), pc=counts(list);
-    h+=`<section class="col"><div class="col-h"><div class="row"><span class="eyebrow">Epic ${pi+1} · ${esc(p.owner)}</span><span class="count mono">${pc.done}/${list.length}</span></div><h2>${esc(p.name)}</h2>${barHTML(pc,list.length)}</div><div class="tasks">`;
-    vis.forEach(s=>{const k=s.key, st=status[k]||'todo', o=owners[k]||s.owner, open=openSet.has(k)?1:0;
-      h+=`<div class="task ${st}" data-open="${open}"><div class="task-top"><span class="key mono">${k}</span><span class="pri ${s.priority}">${s.priority}</span><button class="st" data-k="${k}" aria-label="Status ${LABEL[st]}, click to change">${ICON[st]}${LABEL[st]}</button></div>
-        <div class="t">${esc(s.title)}</div><div class="oname">Owner: ${esc(o)}</div>
-        <button class="more" data-more="${k}">${open?'Hide story':'Show story'}</button>
-        <dl class="detail"><dt>Story</dt><dd>As <b>${esc(s.as)}</b>, I want ${esc(s.want)}, so that ${esc(s.so)}.</dd>
-        <dt>Details</dt><dd>${esc(s.details)}</dd><dt>Done when</dt><dd><ul>${s.ac.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></dd>
-        <dt>Owner</dt><dd><input data-owner="${k}" value="${esc(owners[k]||'')}" placeholder="${esc(s.owner)} (type a name to change)"></dd></dl></div>`;});
-    h+=`</div></section>`;});
+  let h=filtersHTML()+importBanner()+`<main class="kanban">`;
+  const eps=liveEpics(), all=liveStories();
+  stages().forEach(st=>{
+    const inStage=all.filter(s=>s.stage===st.id);
+    h+=`<section class="col" data-stage="${esc(st.id)}"><div class="col-h"><h2>${esc(st.name)}</h2><span class="count mono">${inStage.filter(visible).length}</span></div><div class="col-body">`;
+    eps.forEach(e=>{
+      const list=inStage.filter(s=>s.epicId===e.id).sort(byOrder); if(!list.length) return;
+      const shown=list.filter(visible); const p=progress(epicStories(e.id)); const key=e.id+"|"+st.id; const col=collapsed.has(key);
+      h+=`<div class="grp ${col?'collapsed':''}" data-grp="${esc(e.id)}"><div class="grp-h" data-epic-h="${esc(e.id)}" data-stage="${esc(st.id)}" title="Drag to move the whole epic"><button class="tog" data-tog="${esc(key)}" aria-label="collapse">${col?'▸':'▾'}</button><span class="grp-name">${esc(e.name)}</span><span class="mono grp-n">${shown.length}</span>${barHTML(p.done,p.doing,p.total)}</div><div class="grp-b">${shown.map(cardHTML).join('')}</div></div>`;
+    });
+    h+=`</div></section>`;
+  });
   return h+`</main>`;
+}
+function epicsHTML(){
+  const eps=Object.values(epics||{}).filter(e=>showArchived||!e.archived).sort(byOrder);
+  let h=`<div class="filters" style="max-width:1000px"><button class="chip" data-new-epic="1">+ New epic</button><span style="flex:1"></span><label class="chip" style="cursor:pointer"><input type="checkbox" data-show-archived ${showArchived?'checked':''} style="margin:0 6px 0 0">Show archived</label></div><div class="answers" style="max-width:1000px">`;
+  if(!eps.length) h+=`<section><div class="sh">No epics yet</div><div class="ans"><div class="v empty">Create one with “+ New epic”, or import the defaults from the Board tab.</div></div></section>`;
+  eps.forEach((e,i)=>{ const list=Object.values(stories||{}).filter(s=>s.epicId===e.id&&(showArchived||!s.archived)).sort(byOrder); const p=progress(list.filter(s=>!s.archived)); const es=epicStage(e.id);
+    h+=`<section class="${e.archived?'archived':''}"><div class="sh" style="display:block"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">${esc(e.name)}</b>${e.archived?'<span class="pri">Archived</span>':es?`<span class="pri">${esc(stageName(es))}</span>`:''}<span class="mono" style="font-weight:500;color:var(--ink-3)">${p.done}/${p.total}</span><span style="flex:1"></span>
+      <button class="chip" data-epic-up="${esc(e.id)}" ${i===0?'disabled':''}>↑</button><button class="chip" data-epic-down="${esc(e.id)}" ${i===eps.length-1?'disabled':''}>↓</button><button class="chip" data-new-story="${esc(e.id)}">+ Story</button><button class="chip" data-edit-epic="${esc(e.id)}">Edit</button></div>
+      <div style="font-weight:400;font-size:12.5px;color:var(--ink-2);margin-top:6px">${esc(e.goal||'')}${e.role?` · Default role: ${esc(e.role)}`:''}</div><div style="margin-top:8px">${barHTML(p.done,p.doing,p.total)}</div></div>
+      ${list.map(s=>`<div class="ans ${s.archived?'archived':''}" style="grid-template-columns:auto 1fr auto auto"><span class="key mono">${esc(s.key)}</span><div><div class="v">${esc(s.title)}</div><div class="v" style="font-size:12px;color:var(--ink-3)">${esc(stageName(s.stage))} · ${esc(s.priority)}${s.role?' · '+esc(s.role):''}${s.archived?' · archived':''}</div></div>${avatarHTML(s.assignee,22)}<button class="more" data-edit-story="${esc(s.id)}">Edit</button></div>`).join('')}
+      ${!list.length?`<div class="ans"><div class="v empty">No stories yet.</div></div>`:''}</section>`; });
+  return h+`</div>`;
 }
 function answersHTML(){
   const people=(answers&&answers.people)||{}; const keys=Object.keys(people).sort((a,b)=>(people[b].updatedAt||0)-(people[a].updatedAt||0));
@@ -148,105 +265,260 @@ function loginHTML(msg){
   </section>`;
 }
 function teamHTML(){
-  const emails=(team&&team.emails)||[];
+  const emails=(team&&team.emails)||[]; const st=stages();
+  const input='style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"';
   return `<div class="answers"><section><div class="sh">Team members (can open this board)</div>
-    ${emails.map(e=>`<div class="ans"><div class="q">${esc(e)}</div><div>${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
-    <div class="ans"><div class="q">Add a teammate</div><div><form data-add-email="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="email" required placeholder="their Gmail address" style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"><button class="chip" type="submit">Add</button></form><div class="v empty" style="font-size:12px;margin-top:6px">They sign in with Google using this exact address.</div></div></div>
+    ${emails.map(e=>`<div class="ans"><div class="q" style="display:flex;gap:8px;align-items:center">${avatarHTML({email:e},22)}${esc(e)}</div><div>${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
+    <div class="ans"><div class="q">Add a teammate</div><div><form data-add-email="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="email" required placeholder="their Gmail address" ${input}><button class="chip" type="submit">Add</button></form><div class="v empty" style="font-size:12px;margin-top:6px">They sign in with Google using this exact address.</div></div></div>
   </section>
   <section><div class="sh">Client access code</div>
     <div class="ans"><div class="q">Current code</div><div><b class="mono">${esc(team.clientCode||'— not set —')}</b><div class="v empty" style="font-size:12px;margin-top:4px">Send this code to the client together with the checklist link. They type it to open the page.</div></div></div>
-    <div class="ans"><div class="q">Change code</div><div><form data-set-code="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" required minlength="6" pattern="[A-Za-z0-9-]+" placeholder="letters and numbers, min 6" style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"><button class="chip" type="submit">Set code</button></form><div class="v empty" style="font-size:12px;margin-top:6px">Changing the code starts a fresh answer set — answers given under the old code stay stored but are no longer shown here.</div></div></div>
-  </section>${teamBusy?`<div class="meta">${esc(teamBusy)}</div>`:''}</div>`;
+    <div class="ans"><div class="q">Change code</div><div><form data-set-code="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" required minlength="6" pattern="[A-Za-z0-9-]+" placeholder="letters and numbers, min 6" ${input}><button class="chip" type="submit">Set code</button></form><div class="v empty" style="font-size:12px;margin-top:6px">Changing the code starts a fresh answer set — answers given under the old code stay stored but are no longer shown here.</div></div></div>
+  </section>
+  <section><div class="sh">Board stages (columns)</div>
+    ${st.map((s,i)=>{const n=liveStories().filter(x=>x.stage===s.id).length; return `<div class="ans"><div class="q"><form data-rename-stage="${esc(s.id)}" style="display:flex;gap:8px"><input type="text" required value="${esc(s.name)}" ${input}><button class="chip" type="submit">Rename</button></form></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="v empty" style="font-size:12px">${n} stor${n===1?'y':'ies'}</span><button class="chip" data-stage-up="${esc(s.id)}" ${i===0?'disabled':''}>↑</button><button class="chip" data-stage-down="${esc(s.id)}" ${i===st.length-1?'disabled':''}>↓</button><button class="chip" data-stage-del="${esc(s.id)}" ${n||st.length<=2?'disabled title="Only empty stages can be removed"':''} style="color:#c0392b">Remove</button></div></div>`;}).join('')}
+    <div class="ans"><div class="q">Add a stage</div><div><form data-add-stage="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" required placeholder="e.g. Blocked" ${input}><button class="chip" type="submit">Add</button></form><div class="v empty" style="font-size:12px;margin-top:6px">The last column always counts as “Done” for progress bars.</div></div></div>
+  </section>
+  <section><div class="sh">Data</div><div class="ans"><div class="q">Default epics &amp; stories</div><div>${Object.keys(epics||{}).length?`<span class="v empty">Already imported (${Object.keys(epics).length} epics, ${Object.keys(stories||{}).length} stories).</span>`:`<button class="chip" data-import="1">Import default epics &amp; stories</button>`}</div></div></section>
+  ${teamBusy?`<div class="meta">${esc(teamBusy)}</div>`:''}</div>`;
 }
 function render(){
+  if(drag) return;                                   // never re-render mid-drag
   const root=document.getElementById('root');
   if(!user){ root.innerHTML=loginHTML(authMsg); return; }
   if(!team){ root.innerHTML=loginHTML(teamErr||"Loading team list…"); return; }
   if(!isTeam()){ root.innerHTML=loginHTML(`${user.email} is not on the team list. Ask Danika to add you under “Team & access”.`); return; }
-  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='team'?teamHTML():answersHTML());
+  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='epics'?epicsHTML():tab==='team'?teamHTML():answersHTML());
 }
 
-let saveTimer=null, pending=false;
-function persist(){
-  if(!window.AppleBoxStore||!window.AppleBoxStore.configured){conn="err";connMsg="Not saved (no Firebase)";render();return;}
-  clearTimeout(saveTimer); pending=true; conn="saving"; connMsg="Saving…"; updStatus();
-  saveTimer=setTimeout(async()=>{try{await window.AppleBoxStore.merge("board/state",{status,owners},who);pending=false;conn="live";connMsg="Saved · live";}
-    catch(e){console.error(e);conn="err";connMsg="Save failed: "+(e.code||e.message);} updStatus();},400);
-}
-function updStatus(){const el=document.querySelector('.status'); if(el){el.className='status '+conn; el.innerHTML='<i></i>'+esc(connMsg);}}
+/* ---- modal (replaces confirm()/prompt(); never blocks) ------------------------- */
+function openModal(html,onSubmit){ const m=document.getElementById('modal'); m.innerHTML=`<div class="overlay" data-close="1"></div><div class="dialog" role="dialog" aria-modal="true">${html}</div>`; m.hidden=false; m._onSubmit=onSubmit||null; const f=m.querySelector('input,select,textarea,button'); if(f) f.focus(); }
+function closeModal(){ const m=document.getElementById('modal'); m.hidden=true; m.innerHTML=""; m._onSubmit=null; }
+const fld=(label,inner)=>`<label class="fld"><span>${label}</span>${inner}</label>`;
+const memberOptions=sel=>`<option value="">— Unassigned —</option>`+members().map(m=>`<option value="${esc(m.email)}" ${sel===m.email?'selected':''}>${esc(m.name)} (${esc(m.email)})</option>`).join('');
 
-document.addEventListener('click',e=>{
-  if(e.target.closest('[data-signin]')){authMsg="";render();window.AppleBoxStore.signIn().catch(err=>{authMsg="Sign-in failed: "+(err.code||err.message);render();});return;}
-  if(e.target.closest('[data-signout]')){e.preventDefault();window.AppleBoxStore.signOut();return;}
-  const rm=e.target.closest('[data-rm-email]'); if(rm){saveTeam({emails:team.emails.filter(x=>x!==rm.dataset.rmEmail)});return;}
-  const t=e.target.closest('[data-tab]'); if(t){tab=t.dataset.tab;localStorage.setItem('ab-tab',tab);render();return;}
-  const b=e.target.closest('.st'); if(b){const k=b.dataset.k;status[k]=ORDER[(ORDER.indexOf(status[k]||'todo')+1)%3];render();persist();return;}
-  const m=e.target.closest('.more'); if(m){const k=m.dataset.more;openSet.has(k)?openSet.delete(k):openSet.add(k);render();return;}
-  const pp=e.target.closest('[data-person]'); if(pp){person=pp.dataset.person;delArm=null;render();return;}
-  const da=e.target.closest('[data-delarm]'); if(da){delArm=da.dataset.delarm;render();return;}
-  if(e.target.closest('[data-delcancel]')){delArm=null;render();return;}
-  const dd=e.target.closest('[data-del]'); if(dd){const k=dd.dataset.del; delArm=null; person=null; conn="saving"; connMsg="Deleting…"; updStatus();
-    (k==="_legacy"?window.AppleBoxStore.removeFields(answersPath(),["vals"],who):window.AppleBoxStore.removeFields(answersPath(),["people."+k],who))
-      .then(()=>{conn="live";connMsg="Deleted";updStatus();}).catch(err=>{console.error(err);conn="err";connMsg="Delete failed: "+(err.code||err.message);updStatus();}); return;}
-  const f=e.target.closest('.chip[data-f]'); if(f){filterOwner=f.dataset.f;render();}
+function storyForm(s,epicId){
+  const e=s||{epicId:epicId||(liveEpics()[0]||{}).id,priority:"Medium",stage:"backlog",ac:[]};
+  openModal(`<h3>${s?'Edit '+esc(s.key):'New story'}</h3><form data-story-form="${esc(s?s.id:'')}">
+    ${fld("Epic",`<select name="epicId" required>${liveEpics().map(x=>`<option value="${esc(x.id)}" ${x.id===e.epicId?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`)}
+    ${fld("Title",`<input name="title" required value="${esc(e.title||'')}">`)}
+    <div class="row">${fld("Priority",`<select name="priority">${PRIORITIES.map(p=>`<option ${p===e.priority?'selected':''}>${p}</option>`).join('')}</select>`)}
+    ${fld("Stage",`<select name="stage">${stages().map(x=>`<option value="${esc(x.id)}" ${x.id===e.stage?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`)}</div>
+    <div class="row">${fld("Assignee",`<select name="assignee">${memberOptions(e.assignee&&e.assignee.email)}</select>`)}${fld("Role (if nobody assigned yet)",`<input name="role" value="${esc(e.role||'')}" placeholder="e.g. Designer">`)}</div>
+    <div class="row3">${fld("As …",`<input name="as" value="${esc(e.as||'')}" placeholder="the client">`)}${fld("I want …",`<input name="want" value="${esc(e.want||'')}">`)}${fld("so that …",`<input name="so" value="${esc(e.so||'')}">`)}</div>
+    ${fld("Details",`<textarea name="details" rows="3">${esc(e.details||'')}</textarea>`)}
+    ${fld("Done when (one per line)",`<textarea name="ac" rows="3">${esc((e.ac||[]).join("\n"))}</textarea>`)}
+    <div class="actions">${s?`<button type="button" class="chip" data-archive-story="${esc(s.id)}" style="color:#c0392b">${s.archived?'Restore':'Archive'}</button>`:''}<span style="flex:1"></span><button type="button" class="chip" data-close="1">Cancel</button><button type="submit" class="chip primary">${s?'Save':'Create'}</button></div></form>`);
+}
+function epicForm(e){
+  openModal(`<h3>${e?'Edit epic':'New epic'}</h3><form data-epic-form="${esc(e?e.id:'')}">
+    ${fld("Name",`<input name="name" required value="${esc(e?e.name:'')}">`)}
+    ${fld("Goal",`<textarea name="goal" rows="2">${esc(e?e.goal:'')}</textarea>`)}
+    ${fld("Default role",`<input name="role" value="${esc(e?e.role:'')}" placeholder="e.g. Designer">`)}
+    <div class="actions">${e?`<button type="button" class="chip" data-archive-epic="${esc(e.id)}" style="color:#c0392b">${e.archived?'Restore':'Archive epic'}</button>`:''}<span style="flex:1"></span><button type="button" class="chip" data-close="1">Cancel</button><button type="submit" class="chip primary">${e?'Save':'Create'}</button></div></form>`);
+}
+function moveMenu(storyId){ const s=stories[storyId]; if(!s) return;
+  openModal(`<h3>Move ${esc(s.key)}</h3><p class="hint">${esc(s.title)}</p><div class="menu">${stages().map(st=>`<button class="chip ${st.id===s.stage?'on':''}" data-move-to="${esc(st.id)}" data-story="${esc(s.id)}">${esc(st.name)}</button>`).join('')}</div><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button></div>`); }
+function assignMenu(storyId){ const s=stories[storyId]; if(!s) return; const cur=s.assignee&&s.assignee.email;
+  openModal(`<h3>Assign ${esc(s.key)}</h3><p class="hint">${esc(s.title)}</p><div class="menu"><button class="chip ${!cur?'on':''}" data-assign-to="" data-story="${esc(s.id)}">Unassigned</button>${members().map(m=>`<button class="chip ${cur===m.email?'on':''}" data-assign-to="${esc(m.email)}" data-story="${esc(s.id)}">${avatarHTML({email:m.email},18)} ${esc(m.name)}</button>`).join('')}</div><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button></div>`); }
+function confirmEpicMove(epicId,stageId){ const e=epics[epicId]; const list=epicStories(epicId).filter(s=>s.stage!==stageId); if(!e) return;
+  if(!list.length){ setConn("live","Nothing to move"); return; }
+  openModal(`<h3>Move whole epic?</h3><p class="hint">Move <b>${list.length}</b> stor${list.length===1?'y':'ies'} of “${esc(e.name)}” to <b>${esc(stageName(stageId))}</b>? Stories already there stay where they are.</p><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button><button class="chip primary" data-epic-move="${esc(epicId)}" data-stage="${esc(stageId)}">Move ${list.length}</button></div>`); }
+
+/* ---- writes (optimistic: update local copy, render, then save; revert on error) -- */
+async function saveStory(id,patch,label){
+  const prev={...stories[id]}; Object.assign(stories[id],patch); render(); setConn("saving","Saving…");
+  try{ await S().merge("stories/"+id,patch,who); setConn("live","Saved · live"); }
+  catch(e){ stories[id]=prev; render(); fail(e,label||"Save failed"); }
+}
+function moveStory(id,stageId,prevId,nextId){
+  const s=stories[id]; if(!s) return;
+  const sib=liveStories().filter(x=>x.stage===stageId&&x.epicId===s.epicId&&x.id!==id).sort(byOrder);
+  let order;
+  if(prevId||nextId){ const p=sib.find(x=>x.id===prevId), n=sib.find(x=>x.id===nextId); order=between(p?p.order:"",n?n.order:""); }
+  else if(stageId===s.stage){ return; }
+  else order=between(sib.length?sib[sib.length-1].order:"","");   // append at end of its epic group
+  saveStory(id,{stage:stageId,order},"Move failed");
+}
+async function moveEpic(epicId,stageId){
+  const list=epicStories(epicId).filter(s=>s.stage!==stageId); if(!list.length) return;
+  const last=liveStories().filter(x=>x.stage===stageId&&x.epicId===epicId).sort(byOrder).pop(); let o=last?last.order:"";
+  const ops=list.map(s=>{ o=between(o,""); return {op:"merge",path:"stories/"+s.id,data:{stage:stageId,order:o}}; });
+  const prev=list.map(s=>({id:s.id,stage:s.stage,order:s.order}));
+  ops.forEach(op=>Object.assign(stories[op.path.split("/")[1]],op.data)); render(); setConn("saving","Moving epic…");
+  try{ await S().batch(ops,who); setConn("live","Saved · live"); }
+  catch(e){ prev.forEach(p=>Object.assign(stories[p.id],{stage:p.stage,order:p.order})); render(); fail(e,"Epic move failed"); }
+}
+async function saveTeam(patch){ teamBusy="Saving…"; render(); try{ await S().merge("config/team",patch,user.email); teamBusy=""; }catch(err){ fail(err,"Save failed"); teamBusy="Save failed: "+(err.code||err.message); render(); } }
+async function saveMeta(patch){ setConn("saving","Saving…"); try{ await S().merge("board/meta",patch,who); setConn("live","Saved · live"); }catch(e){ fail(e,"Save failed"); } }
+async function createEpic(data){ const eps=liveEpics(); const order=between(eps.length?eps[eps.length-1].order:"",""); const id=uid();
+  setConn("saving","Saving…"); try{ await S().merge("epics/"+id,{...data,order,archived:false,createdAt:Date.now()},who); setConn("live","Saved · live"); return id; }catch(e){ fail(e,"Create failed"); } }
+async function createStory(data){ const n=await S().nextKeys(1); const id="ab-"+n; const sib=liveStories().filter(x=>x.stage===data.stage&&x.epicId===data.epicId).sort(byOrder);
+  const order=between(sib.length?sib[sib.length-1].order:"",""); setConn("saving","Saving…");
+  try{ await S().merge("stories/"+id,{...data,key:"AB-"+n,order,archived:false,createdAt:Date.now()},who); setConn("live","Saved · live"); }catch(e){ fail(e,"Create failed"); } }
+function reorder(list,id,dir,col){ const i=list.findIndex(x=>x.id===id); const j=i+dir; if(i<0||j<0||j>=list.length) return;
+  const before=dir<0?list[j-1]:list[j], after=dir<0?list[j]:list[j+1]; const order=between(before?before.order:"",after?after.order:"");
+  if(col==="epics"){ epics[id].order=order; render(); S().merge("epics/"+id,{order},who).catch(e=>fail(e,"Reorder failed")); } }
+
+/* ---- one-time import of the seed data ------------------------------------------ */
+async function importDefaults(){
+  if(Object.keys(epics||{}).length){ setConn("err","Already imported"); return; }
+  setConn("saving","Importing…");
+  try{
+    const legacy=(await S().get("board/state"))||{}; const status=legacy.status||{}, owners=legacy.owners||{};
+    const mapStage={todo:"todo",doing:"doing",done:"done"};
+    const ops=[]; const ek=seedKeys(PHASES.length); let maxN=0;
+    PHASES.forEach((p,pi)=>{
+      ops.push({op:"set",path:"epics/"+p.id,data:{name:p.name,goal:p.goal,role:p.owner,order:ek[pi],archived:false,createdAt:Date.now()}});
+      const sk=seedKeys(p.stories.length);
+      p.stories.forEach((s,si)=>{ const n=parseInt(s.key.split("-")[1],10); maxN=Math.max(maxN,n);
+        ops.push({op:"set",path:"stories/"+s.key.toLowerCase(),data:{key:s.key,epicId:p.id,title:s.title,priority:s.priority,role:owners[s.key]||s.owner,assignee:null,
+          stage:mapStage[status[s.key]]||"todo",order:sk[si],as:s.as,want:s.want,so:s.so,details:s.details,ac:s.ac,archived:false,createdAt:Date.now()}}); }); });
+    ops.push({op:"merge",path:"board/meta",data:{stages:DEFAULT_STAGES,nextKey:maxN+1,migratedAt:Date.now()}});
+    await S().batch(ops,who); setConn("live","Imported "+(ops.length-PHASES.length-1)+" stories");
+  }catch(e){ fail(e,"Import failed"); }
+}
+
+/* ---- drag and drop (pointer events; works with mouse, pen and touch) ----------
+   Mouse: drag starts after 6px of movement. Touch: after a 300ms long-press
+   (so normal scrolling keeps working). A ghost follows the pointer, a placeholder
+   marks the drop slot. Epic headers can be dragged too (bulk move, with confirm). */
+function startDrag(kind,id,x,y,srcEl){
+  const ghost=srcEl.cloneNode(true); ghost.className+=" ghost"; ghost.style.width=srcEl.offsetWidth+"px"; document.body.appendChild(ghost);
+  const ph=document.createElement("div"); ph.className="ph"; ph.style.height=(kind==="story"?srcEl.offsetHeight:44)+"px";
+  drag={kind,id,ghost,ph,srcEl,stage:null,prev:null,next:null,epicId:kind==="story"?stories[id].epicId:id};
+  srcEl.classList.add("dragging"); document.body.classList.add("dragging-any"); moveGhost(x,y);
+}
+function moveGhost(x,y){ drag.ghost.style.transform=`translate(${x-20}px,${y-16}px)`; }
+function onDragMove(x,y){
+  moveGhost(x,y);
+  drag.ghost.style.display="none"; const el=document.elementFromPoint(x,y); drag.ghost.style.display="";
+  const col=el&&el.closest(".col"); if(!col){ drag.stage=null; return; }
+  drag.stage=col.dataset.stage; const body=col.querySelector(".col-body");
+  if(drag.kind==="epic"){ col.classList.add("drop"); document.querySelectorAll(".col.drop").forEach(c=>{ if(c!==col) c.classList.remove("drop"); }); return; }
+  // story: only positions inside its own epic group are meaningful
+  let grp=[...body.querySelectorAll(".grp")].find(g=>g.dataset.grp===drag.epicId);
+  if(!grp){ if(drag.ph.parentNode!==body) body.appendChild(drag.ph); drag.prev=null; drag.next=null; return; }
+  const cards=[...grp.querySelectorAll(".card")].filter(c=>c!==drag.srcEl);
+  drag.ph.style.display="none";                       // measure without the placeholder shifting things
+  let next=null; for(const c of cards){ const r=c.getBoundingClientRect(); if(y<r.top+r.height/2){ next=c; break; } }
+  drag.ph.style.display="";
+  const gb=grp.querySelector(".grp-b"); if(next) gb.insertBefore(drag.ph,next); else gb.appendChild(drag.ph);
+  drag.next=next?next.dataset.card:null; const prevEl=drag.ph.previousElementSibling; drag.prev=prevEl&&prevEl.classList.contains("card")&&prevEl!==drag.srcEl?prevEl.dataset.card:null;
+  if(drag.prev===null){ const ps=[...gb.children]; const i=ps.indexOf(drag.ph); for(let k=i-1;k>=0;k--){ const c=ps[k]; if(c.classList.contains("card")&&c!==drag.srcEl){ drag.prev=c.dataset.card; break; } } }
+}
+function endDrag(commit){
+  const d=drag; drag=null; d.ghost.remove(); d.ph.remove(); d.srcEl.classList.remove("dragging"); document.body.classList.remove("dragging-any"); document.querySelectorAll(".col.drop").forEach(c=>c.classList.remove("drop"));
+  if(commit&&d.stage){ if(d.kind==="story") moveStory(d.id,d.stage,d.prev,d.next); else confirmEpicMove(d.id,d.stage); }
+  render();
+}
+let pend=null; // pending press before a drag starts
+document.addEventListener("pointerdown",e=>{
+  if(e.button!==0||drag) return; if(e.target.closest("button,input,select,textarea,a,.detail")) return;
+  const card=e.target.closest(".card"), eh=e.target.closest(".grp-h"); if(!card&&!eh) return;
+  const kind=card?"story":"epic", id=card?card.dataset.card:eh.dataset.epicH, el=card||eh;
+  pend={kind,id,el,x:e.clientX,y:e.clientY,touch:e.pointerType!=="mouse",timer:null};
+  if(pend.touch){ pend.timer=setTimeout(()=>{ if(pend){ startDrag(pend.kind,pend.id,pend.x,pend.y,pend.el); if(navigator.vibrate) navigator.vibrate(15); } },300); }
 });
-async function saveTeam(patch){
-  teamBusy="Saving…"; render();
-  try{ await window.AppleBoxStore.merge("config/team",patch,user.email); teamBusy=""; }
-  catch(err){ console.error(err); teamBusy="Save failed: "+(err.code||err.message); render(); }
-}
+document.addEventListener("pointermove",e=>{
+  if(drag){ e.preventDefault(); onDragMove(e.clientX,e.clientY); return; }
+  if(!pend) return; const dx=e.clientX-pend.x, dy=e.clientY-pend.y, dist=Math.hypot(dx,dy);
+  if(pend.touch){ if(dist>10){ clearTimeout(pend.timer); pend=null; } return; }   // finger moved: it's a scroll
+  if(dist>6){ const p=pend; pend=null; startDrag(p.kind,p.id,e.clientX,e.clientY,p.el); }
+},{passive:false});
+document.addEventListener("touchmove",e=>{ if(drag) e.preventDefault(); },{passive:false});
+const cancelPend=()=>{ if(pend){ clearTimeout(pend.timer); pend=null; } };
+document.addEventListener("pointerup",e=>{ cancelPend(); if(drag) endDrag(true); });
+document.addEventListener("contextmenu",e=>{ if(drag||(pend&&pend.touch)) e.preventDefault(); });
+document.addEventListener("pointercancel",()=>{ cancelPend(); if(drag) endDrag(false); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(drag) endDrag(false); else closeModal(); }
+  if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("card")){ moveMenu(e.target.dataset.card); } });
+
+/* ---- events ---------------------------------------------------------------------- */
+document.addEventListener('click',e=>{
+  const t=e.target;
+  if(t.closest('[data-close]')){ closeModal(); return; }
+  if(t.closest('[data-signin]')){authMsg="";render();S().signIn().catch(err=>{authMsg="Sign-in failed: "+(err.code||err.message);render();});return;}
+  if(t.closest('[data-signout]')){e.preventDefault();S().signOut();return;}
+  let b;
+  if(b=t.closest('[data-tab]')){tab=b.dataset.tab;localStorage.setItem('ab-tab',tab);render();return;}
+  if(b=t.closest('[data-tog]')){ const k=b.dataset.tog; collapsed.has(k)?collapsed.delete(k):collapsed.add(k); persistCollapsed(); render(); return; }
+  if(b=t.closest('[data-more]')){ const k=b.dataset.more; openSet.has(k)?openSet.delete(k):openSet.add(k); render(); return; }
+  if(b=t.closest('[data-move]')){ moveMenu(b.dataset.move); return; }
+  if(b=t.closest('[data-assign]')){ assignMenu(b.dataset.assign); return; }
+  if(b=t.closest('[data-move-to]')){ closeModal(); moveStory(b.dataset.story,b.dataset.moveTo,null,null); return; }
+  if(b=t.closest('[data-assign-to]')){ closeModal(); const m=memberOf(b.dataset.assignTo); saveStory(b.dataset.story,{assignee:m?{email:m.email,name:m.name}:null},"Assign failed"); return; }
+  if(b=t.closest('[data-epic-move]')){ closeModal(); moveEpic(b.dataset.epicMove,b.dataset.stage); return; }
+  if(b=t.closest('[data-edit-story]')){ storyForm(stories[b.dataset.editStory]); return; }
+  if(b=t.closest('[data-new-story]')){ if(!liveEpics().length){ setConn("err","Create an epic first"); return; } storyForm(null,b.dataset.newStory||null); return; }
+  if(b=t.closest('[data-edit-epic]')){ epicForm(epics[b.dataset.editEpic]); return; }
+  if(b=t.closest('[data-new-epic]')){ epicForm(null); return; }
+  if(b=t.closest('[data-archive-story]')){ const s=stories[b.dataset.archiveStory]; closeModal(); saveStory(s.id,{archived:!s.archived},"Archive failed"); return; }
+  if(b=t.closest('[data-archive-epic]')){ const ep=epics[b.dataset.archiveEpic]; closeModal(); ep.archived=!ep.archived; render(); S().merge("epics/"+ep.id,{archived:ep.archived},who).catch(err=>fail(err,"Archive failed")); return; }
+  if(b=t.closest('[data-epic-up]')){ reorder(liveEpics(),b.dataset.epicUp,-1,"epics"); return; }
+  if(b=t.closest('[data-epic-down]')){ reorder(liveEpics(),b.dataset.epicDown,1,"epics"); return; }
+  if(b=t.closest('[data-stage-up],[data-stage-down]')){ const id=b.dataset.stageUp||b.dataset.stageDown, dir=b.dataset.stageUp?-1:1; const st=stages().slice(); const i=st.findIndex(s=>s.id===id); if(i+dir<0||i+dir>=st.length) return; [st[i],st[i+dir]]=[st[i+dir],st[i]]; meta={...(meta||{}),stages:st}; render(); saveMeta({stages:st}); return; }
+  if(b=t.closest('[data-stage-del]')){ const st=stages().filter(s=>s.id!==b.dataset.stageDel); meta={...(meta||{}),stages:st}; render(); saveMeta({stages:st}); return; }
+  if(b=t.closest('[data-import]')){ importDefaults(); return; }
+  if(b=t.closest('[data-person]')){person=b.dataset.person;delArm=null;render();return;}
+  if(b=t.closest('[data-delarm]')){delArm=b.dataset.delarm;render();return;}
+  if(t.closest('[data-delcancel]')){delArm=null;render();return;}
+  if(b=t.closest('[data-del]')){const k=b.dataset.del; delArm=null; person=null; setConn("saving","Deleting…");
+    (k==="_legacy"?S().removeFields(answersPath(),["vals"],who):S().removeFields(answersPath(),["people."+k],who)).then(()=>setConn("live","Deleted")).catch(err=>fail(err,"Delete failed")); return;}
+  if(b=t.closest('[data-rm-email]')){ saveTeam({emails:team.emails.filter(x=>x!==b.dataset.rmEmail)}); return; }
+  if(b=t.closest('.chip[data-f]')){ filterA=b.dataset.f; localStorage.setItem('ab-filter',filterA); render(); }
+});
 document.addEventListener('submit',async e=>{
-  const f=e.target; if(!f.dataset) return;
-  if(f.dataset.addEmail){e.preventDefault(); const v=f.querySelector('input').value.trim().toLowerCase(); if(v&&!team.emails.includes(v)) await saveTeam({emails:[...team.emails,v]}); return;}
-  if(f.dataset.setCode){e.preventDefault(); const c=codeSlug(f.querySelector('input').value); if(c.length<6) return;
-    teamBusy="Saving…"; render();
-    try{ await window.AppleBoxStore.merge("intake/client-"+c,{created:Date.now()},user.email); await window.AppleBoxStore.merge("config/team",{clientCode:c},user.email); teamBusy=""; }
-    catch(err){ console.error(err); teamBusy="Save failed: "+(err.code||err.message); render(); }
-    return;}
+  const f=e.target; if(!f.dataset) return; e.preventDefault(); const fd=new FormData(f); const v=k=>String(fd.get(k)||"").trim();
+  if(f.dataset.storyForm!==undefined){ const m=memberOf(v("assignee")); const data={epicId:v("epicId"),title:v("title"),priority:v("priority"),stage:v("stage"),assignee:m?{email:m.email,name:m.name}:null,role:v("role"),as:v("as"),want:v("want"),so:v("so"),details:v("details"),ac:v("ac").split("\n").map(x=>x.trim()).filter(Boolean)};
+    closeModal(); if(f.dataset.storyForm){ const id=f.dataset.storyForm; const old=stories[id]; if(old.stage!==data.stage){ const sib=liveStories().filter(x=>x.stage===data.stage&&x.epicId===data.epicId&&x.id!==id).sort(byOrder); data.order=between(sib.length?sib[sib.length-1].order:"",""); } saveStory(id,data); } else await createStory(data); return; }
+  if(f.dataset.epicForm!==undefined){ const data={name:v("name"),goal:v("goal"),role:v("role")}; closeModal(); if(f.dataset.epicForm){ const id=f.dataset.epicForm; Object.assign(epics[id],data); render(); S().merge("epics/"+id,data,who).catch(err=>fail(err,"Save failed")); } else await createEpic(data); return; }
+  if(f.dataset.addEmail){ const em=(f.querySelector('input').value||"").trim().toLowerCase(); if(em&&!team.emails.includes(em)) await saveTeam({emails:[...team.emails,em]}); return; }
+  if(f.dataset.setCode){ const c=codeSlug(f.querySelector('input').value); if(c.length<6) return; teamBusy="Saving…"; render();
+    try{ await S().merge("intake/client-"+c,{created:Date.now()},user.email); await S().merge("config/team",{clientCode:c},user.email); teamBusy=""; }catch(err){ teamBusy="Save failed: "+(err.code||err.message); render(); } return; }
+  if(f.dataset.renameStage){ const st=stages().map(s=>s.id===f.dataset.renameStage?{...s,name:f.querySelector('input').value.trim()||s.name}:s); meta={...(meta||{}),stages:st}; render(); saveMeta({stages:st}); return; }
+  if(f.dataset.addStage){ const name=f.querySelector('input').value.trim(); if(!name) return; const id=name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||uid(); if(stages().some(s=>s.id===id)){ setConn("err","A stage with that name exists"); return; }
+    const st=[...stages()]; st.splice(st.length-1,0,{id,name}); meta={...(meta||{}),stages:st}; render(); saveMeta({stages:st}); return; }   // insert before Done
 });
 document.addEventListener('change',e=>{
-  if(e.target.matches('[data-owner]')){const v=e.target.value.trim(); if(v) owners[e.target.dataset.owner]=v; else delete owners[e.target.dataset.owner]; render(); persist();}
   if(e.target.id==='who'){who=e.target.value.trim();localStorage.setItem('ab-who',who);}
+  if(e.target.matches('[data-show-archived]')){ showArchived=e.target.checked; render(); }
 });
-render();
-setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not load — check internet / firebase-config.js'; updStatus(); } },8000);
-function stopWatches(){ if(unwatchBoard){unwatchBoard();unwatchBoard=null;} if(unwatchAns){unwatchAns();unwatchAns=null;} }
-function watchAnswers(){
-  if(unwatchAns){unwatchAns();unwatchAns=null;} answers=null; person=null;
-  const p=answersPath(); if(!p){ if(tab==='answers') render(); return; }
-  unwatchAns=window.AppleBoxStore.watch(p,d=>{ answers=d; if(tab==='answers') render(); },err=>console.error(err));
+
+/* ---- boot: auth → team → live data ------------------------------------------------ */
+let profileSynced=false, unTeam=null, unMeta=null, unEpics=null, unStories=null, unAns=null, lastAnsPath=null;
+function stopAll(){ [unMeta,unEpics,unStories,unAns].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
+function startData(){
+  if(unMeta) return;
+  const S_=S(); const onErr=err=>{ setConn("err","Connection error: "+err.code); };
+  unMeta=S_.watch("board/meta",d=>{ meta=d||{}; render(); },onErr);
+  unEpics=S_.watchCollection("epics",list=>{ epics=Object.fromEntries(list.map(e=>[e.id,e])); render(); },onErr);
+  unStories=S_.watchCollection("stories",list=>{ stories=Object.fromEntries(list.map(s=>[s.id,s])); const last=list.map(s=>s.updatedBy).filter(Boolean).pop(); if(conn!=="saving"){ conn="live"; connMsg=last?`Live · last change by ${last}`:"Live"; } render(); },onErr);
 }
-async function bootstrapTeam(S){
-  // First ever sign-in by the owner: create the team list with this account.
-  if(!BOOTSTRAP.includes((user.email||"").toLowerCase())) return false;
-  try{ await S.merge("config/team",{emails:[user.email.toLowerCase()],clientCode:""},user.email); return true; }catch(e){ console.error("bootstrap",e); return false; }
-}
+function watchAnswers(){ if(unAns){unAns();unAns=null;} answers=null; person=null; const p=answersPath(); if(!p){ if(tab==='answers') render(); return; }
+  unAns=S().watch(p,d=>{ answers=d; if(tab==='answers') render(); },err=>console.error(err)); }
+async function bootstrapTeam(){ if(!BOOTSTRAP.includes((user.email||"").toLowerCase())) return false;
+  try{ await S().merge("config/team",{emails:[user.email.toLowerCase()],clientCode:""},user.email); return true; }catch(e){ console.error("bootstrap",e); return false; } }
 document.addEventListener('applebox-store-ready',()=>{
-  const S=window.AppleBoxStore; if(!S.configured){conn="err";connMsg="Not connected";user=null;render();return;}
-  let unwatchTeam=null, lastAnsPath=null;
-  S.onAuth(async u=>{
-    user=u||null; team=null; teamErr=""; stopWatches(); if(unwatchTeam){unwatchTeam();unwatchTeam=null;} lastAnsPath=null;
-    render(); if(!user) return;
+  const S_=S(); if(!S_.configured){conn="err";connMsg="Not connected";user=null;render();return;}
+  S_.onAuth(async u=>{
+    user=u||null; team=null; teamErr=""; stopAll(); if(unTeam){unTeam();unTeam=null;} render(); if(!user) return;
     if(!who&&user.displayName){who=user.displayName;localStorage.setItem('ab-who',who);}
-    const startTeamWatch=()=>{ unwatchTeam=S.watch("config/team",d=>{
+    const startTeamWatch=()=>{ unTeam=S_.watch("config/team",d=>{
         team=d||{emails:[],clientCode:""}; teamErr="";
-        if(!isTeam()){ stopWatches(); lastAnsPath=null; render(); return; }
-        if(!unwatchBoard){ unwatchBoard=S.watch("board/state",d=>{ if(pending) return; status=(d&&d.status)||{}; owners=(d&&d.owners)||{}; conn="live"; connMsg=d&&d.updatedBy?`Live · last change by ${d.updatedBy}`:"Live"; render(); },err=>{conn="err";connMsg="Connection error: "+err.code;render();}); }
-        if(answersPath()!==lastAnsPath){ lastAnsPath=answersPath(); watchAnswers(); }
-        render();
+        if(!isTeam()){ stopAll(); render(); return; }
+        // remember my display name/photo so teammates see them on cards
+        const k=emailKey(user.email), prof=(team.profiles||{})[k]||{}; if(!profileSynced&&user.displayName&&(prof.name!==user.displayName||prof.photo!==(user.photoURL||""))){ profileSynced=true; S_.merge("config/team",{profiles:{[k]:{name:user.displayName,photo:user.photoURL||""}}},user.email).catch(()=>{}); }
+        startData(); if(answersPath()!==lastAnsPath){ lastAnsPath=answersPath(); watchAnswers(); } render();
       },async err=>{
-        if(err.code==='permission-denied'){
-          // Either not on the team, or the team list does not exist yet.
-          let existsNow=false;
-          if(BOOTSTRAP.includes((user.email||"").toLowerCase())){ existsNow=await bootstrapTeam(S); }
-          if(existsNow){ if(unwatchTeam) unwatchTeam(); startTeamWatch(); return; }
-          team={emails:[],clientCode:""}; render(); return;
-        }
+        if(err.code==='permission-denied'){ let ok=false; if(BOOTSTRAP.includes((user.email||"").toLowerCase())) ok=await bootstrapTeam(); if(ok){ if(unTeam) unTeam(); startTeamWatch(); return; } team={emails:[],clientCode:""}; render(); return; }
         teamErr="Connection error: "+err.code; render();
       }); };
     startTeamWatch();
   });
 });
+render();
+setTimeout(()=>{ if(conn==='off'){ conn='err'; connMsg='Database script did not load — check internet / firebase-config.js'; updStatus(); } },8000);
 </script>
 </body>
 </html>

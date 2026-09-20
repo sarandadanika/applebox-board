@@ -281,20 +281,26 @@ function answersHTML(){
   return h+`</div>`;
 }
 /* ---- Time tab (admins): totals, per person, per epic, per task -------------------- */
-function periodStart(){ const d=new Date(); if(timeP==="week"){ d.setDate(d.getDate()-((d.getDay()+6)%7)); return ymd(d); } if(timeP==="month"){ d.setDate(1); return ymd(d); } return ""; }
-function timeEntries(){ const from=periodStart(); const rows=[];
-  Object.values(stories||{}).forEach(s=>logsOf(s).forEach(l=>{ if(from&&(l.date||"")<from) return; if(timeWho!=="all"&&l.email!==timeWho) return; rows.push({...l,story:s}); }));
+const PERIODS=[["all","All time"],["today","Today"],["week","This week"],["lastweek","Last week"],["month","This month"],["lastmonth","Last month"]];
+function periodRange(){ const d=new Date(), t=ymd(d);                  // [from,to] as local YYYY-MM-DD, "" = open
+  if(timeP==="today") return [t,t];
+  if(timeP==="week"||timeP==="lastweek"){ d.setDate(d.getDate()-((d.getDay()+6)%7)); if(timeP==="week") return [ymd(d),""]; const e=new Date(d); e.setDate(e.getDate()-1); d.setDate(d.getDate()-7); return [ymd(d),ymd(e)]; }
+  if(timeP==="month"){ d.setDate(1); return [ymd(d),""]; }
+  if(timeP==="lastmonth"){ d.setDate(0); const e=ymd(d); d.setDate(1); return [ymd(d),e]; }
+  return ["",""]; }
+function timeEntries(){ const [from,to]=periodRange(); const rows=[];
+  Object.values(stories||{}).forEach(s=>logsOf(s).forEach(l=>{ if(from&&(l.date||"")<from) return; if(to&&(l.date||"")>to) return; if(timeWho!=="all"&&l.email!==timeWho) return; rows.push({...l,story:s}); }));
   return rows.sort((a,b)=>cmp(b.date||"",a.date||"")||(b.at||0)-(a.at||0)); }
 function timeHTML(){
   if(stories===null) return `<div class="banner">Loading…</div>`;
   const rows=timeEntries(), total=sumMin(rows);
-  const everyone={}; Object.values(stories).forEach(s=>logsOf(s).forEach(l=>{ everyone[l.email]=personName(l); }));
-  const chip=(attr,id,label,on)=>`<button class="chip ${on?'on':''}" data-${attr}="${esc(id)}">${esc(label)}</button>`;
+  const everyone={}; members().forEach(m=>{ everyone[m.email]=m.name; }); Object.values(stories).forEach(s=>logsOf(s).forEach(l=>{ if(!everyone[l.email]) everyone[l.email]=personName(l); }));
+  const sel='style="font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-height:32px"';
   const group=(keyFn)=>{ const g={}; rows.forEach(r=>{ const k=keyFn(r); (g[k]=g[k]||[]).push(r); }); return Object.entries(g).map(([k,list])=>({k,list,min:sumMin(list)})).sort((a,b)=>b.min-a.min); };
   const byPerson=group(r=>r.email), byEpic=group(r=>r.story.epicId), byTask=group(r=>r.story.id);
   const share=m=>`<div class="bar" style="margin-top:6px"><i class="p" style="width:${total?m/total*100:0}%"></i></div>`;
-  let h=`<div class="filters" style="max-width:1000px"><span class="fl">Period</span>${chip("tp","all","All time",timeP==="all")}${chip("tp","week","This week",timeP==="week")}${chip("tp","month","This month",timeP==="month")}
-    <span class="fl" style="margin-left:10px">Person</span>${chip("tw","all","Everyone",timeWho==="all")}${Object.entries(everyone).map(([e,n])=>chip("tw",e,n,timeWho===e)).join('')}<span style="flex:1"></span><button class="chip" data-csv="1" ${rows.length?'':'disabled'}>Export CSV</button></div>
+  let h=`<div class="filters" style="max-width:1000px"><label class="fl" for="time-p">Period</label><select id="time-p" data-time-p ${sel}>${PERIODS.map(([id,n])=>`<option value="${id}" ${timeP===id?'selected':''}>${n}</option>`).join('')}</select>
+    <label class="fl" for="time-w" style="margin-left:10px">Person</label><select id="time-w" data-time-w ${sel}><option value="all">Everyone</option>${Object.entries(everyone).map(([e,n])=>`<option value="${esc(e)}" ${timeWho===e?'selected':''}>${esc(n)}</option>`).join('')}</select><span style="flex:1"></span><button class="chip" data-csv="1" ${rows.length?'':'disabled'}>Export CSV</button></div>
     <div class="tiles"><div class="tile"><span>Total time spent</span><b class="mono">${fmtMin(total)}</b></div><div class="tile"><span>Tasks with time</span><b class="mono">${byTask.length}</b></div><div class="tile"><span>People</span><b class="mono">${byPerson.length}</b></div><div class="tile"><span>Entries</span><b class="mono">${rows.length}</b></div></div>
     <div class="answers" style="max-width:1000px">`;
   if(!rows.length) return h+`<section><div class="sh">No time logged${timeP!=="all"||timeWho!=="all"?' for this filter':' yet'}</div><div class="ans"><div class="v empty">Use “Log time” on any card on the Board. Entries show up here straight away.</div></div></section></div>`;
@@ -523,8 +529,6 @@ document.addEventListener('click',e=>{
   if(b=t.closest('[data-assign]')){ assignMenu(b.dataset.assign); return; }
   if(b=t.closest('[data-log]')){ timeModal(b.dataset.log); return; }
   if(b=t.closest('[data-del-log]')){ delLog(b.dataset.story,b.dataset.delLog); return; }
-  if(b=t.closest('[data-tp]')){ timeP=b.dataset.tp; render(); return; }
-  if(b=t.closest('[data-tw]')){ timeWho=b.dataset.tw; render(); return; }
   if(t.closest('[data-csv]')){ exportCSV(); return; }
   if(b=t.closest('[data-admin]')){ if(!isAdmin()) return; const em=b.dataset.admin.toLowerCase(), cur=((team.admins)||[]).map(x=>x.toLowerCase()); saveTeam({admins:cur.includes(em)?cur.filter(x=>x!==em):[...cur,em]}); return; }
   if(b=t.closest('[data-move-to]')){ closeModal(); moveStory(b.dataset.story,b.dataset.moveTo,null,null); return; }
@@ -568,6 +572,8 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='who'){who=e.target.value.trim();localStorage.setItem('ab-who',who);}
   if(e.target.matches('[data-show-archived]')){ showArchived=e.target.checked; render(); }
+  if(e.target.matches('[data-time-p]')){ timeP=e.target.value; render(); }
+  if(e.target.matches('[data-time-w]')){ timeWho=e.target.value; render(); }
 });
 
 /* ---- boot: auth → team → live data ------------------------------------------------ */

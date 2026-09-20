@@ -84,6 +84,15 @@ body.dragging-any{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .ans .q{color:var(--ink-2)} .ans .v{white-space:pre-wrap} .ans .v.empty{color:var(--ink-3);font-style:italic}
 .ans.req .q::after{content:" *";color:var(--accent)}
 .meta{max-width:900px;margin:0 auto 12px;font-size:12px;color:var(--ink-3)}
+/* time tracking */
+.tm{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--ink-2)} .tm svg{width:11px;height:11px}
+.tiles{max-width:1000px;margin:0 auto 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.tile span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.tile b{display:block;font-size:22px;font-weight:800;margin-top:2px}
+.tlogs{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.tlog{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
+.tlog:last-child{border-bottom:0} .tlog .n{color:var(--ink-3);font-size:12px}
 .tabs{overflow-x:auto;flex-wrap:nowrap} .tab{white-space:nowrap;flex-shrink:0}
 @media (max-width:640px){.ans{grid-template-columns:1fr}.kanban{grid-auto-columns:88vw;gap:10px}.col-h{position:static}.tabs .mono,.tabs span:not(.fl){display:none}}
 </style>
@@ -101,8 +110,9 @@ const SECTIONS=[{"name":"Channel identity","why":"Used on every profile — must
      board/meta        { stages:[{id,name}], nextKey }
      epics/{id}        { name, goal, role, order, archived }
      stories/{id}      { key, epicId, title, priority, role, assignee:{email,name}|null,
-                         stage, order, as, want, so, details, ac:[], archived }
-     config/team       { emails:[], clientCode, profiles:{ "a,b@gmail,com":{name,photo} } }
+                         stage, order, as, want, so, details, ac:[], archived,
+                         logs:{ logId:{email,name,minutes,date:"YYYY-MM-DD",note,at} } }   // time tracking
+     config/team       { emails:[], admins:[], clientCode, profiles:{ "a,b@gmail,com":{name,photo} } }
    PHASES (above) is only the seed used by "Import default epics & stories".
    ============================================================================== */
 const PRIORITIES=["Highest","High","Medium","Low"];
@@ -142,6 +152,7 @@ let answers=null, person=null, delArm=null;
 let tab=localStorage.getItem("ab-tab")||"board", filterA=localStorage.getItem("ab-filter")||"all";
 let who=localStorage.getItem("ab-who")||"", conn="off", connMsg="Connecting…";
 let openSet=new Set(), collapsed=new Set(JSON.parse(localStorage.getItem("ab-collapsed")||"[]")), showArchived=false;
+let timeP="all", timeWho="all";                  // Time tab filters: period, person
 let drag=null;                                   // active drag, see startDrag()
 const BOOTSTRAP=["danika.saranda@gmail.com","saranda.danika@gmail.com"];
 const codeSlug=c=>String(c||"").trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
@@ -159,6 +170,19 @@ const epicStage=eid=>{ const ss=epicStories(eid); if(!ss.length) return null; re
 const members=()=>{ const prof=(team&&team.profiles)||{}; return ((team&&team.emails)||[]).map(e=>{const p=prof[emailKey(e)]||{}; return {email:e.toLowerCase(),name:p.name||e.split("@")[0],photo:p.photo||""};}); };
 const memberOf=email=>members().find(m=>m.email===(email||"").toLowerCase());
 const doneId=()=>stages()[stages().length-1].id;
+
+/* ---- time tracking helpers ------------------------------------------------------
+   Entries live in stories/{id}.logs, one map key per entry, so concurrent logging never
+   collides. Owner accounts are always admins; others are listed in config/team.admins. */
+const isAdminEmail=e=>{ e=(e||"").toLowerCase(); return BOOTSTRAP.includes(e)||((team&&team.admins)||[]).map(x=>x.toLowerCase()).includes(e); };
+const isAdmin=()=>!!user&&isAdminEmail(user.email);
+const logsOf=s=>Object.entries((s&&s.logs)||{}).map(([id,l])=>({id,...l})).sort((a,b)=>cmp(b.date||"",a.date||"")||(b.at||0)-(a.at||0));
+const minsOf=s=>Object.values((s&&s.logs)||{}).reduce((n,l)=>n+(+l.minutes||0),0);
+const sumMin=list=>list.reduce((n,l)=>n+(+l.minutes||0),0);
+const fmtMin=m=>{ m=Math.round(m||0); const h=Math.floor(m/60), r=m%60; return h&&r?`${h}h ${r}m`:h?`${h}h`:`${r}m`; };
+const ymd=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);   // local date
+const personName=l=>{ const m=memberOf(l.email); return (m&&m.name)||l.name||l.email||"?"; };
+const CLOCK='<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.4V6l1.8 1.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
 
 function persistCollapsed(){ localStorage.setItem("ab-collapsed",JSON.stringify([...collapsed])); }
 function updStatus(){const el=document.querySelector('.status'); if(el){el.className='status '+conn; el.innerHTML='<i></i>'+esc(connMsg);}}
@@ -179,11 +203,12 @@ function header(){
     <div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">Internal · YouTube, Facebook, Instagram, TikTok setup · @appleboxlk</p></div></div>
     <div class="summary">
       <div class="meter"><div class="meter-label"><span>Overall</span><b class="mono">${p.done} / ${p.total} done</b></div>${barHTML(p.done,p.doing,p.total)}
-      <div class="legend"><span class="ld">Done ${p.done}</span><span class="lp">In progress ${p.doing}</span><span class="lt">Not started ${p.total-p.done-p.doing}</span></div></div>
+      <div class="legend"><span class="ld">Done ${p.done}</span><span class="lp">In progress ${p.doing}</span><span class="lt">Not started ${p.total-p.done-p.doing}</span></div>
+      ${isAdmin()?`<div class="meter-label"><span>Time logged</span><b class="mono">${fmtMin(sumMin(Object.values(stories||{}).map(s=>({minutes:minsOf(s)}))))}</b></div>`:''}</div>
       <div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="e.g. Danika"></div>
       <div class="status ${conn}"><i></i>${esc(connMsg)}</div>
     </div></header>
-    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Board</button><button class="tab ${tab==='epics'?'on':''}" data-tab="epics">Epics</button><button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
+    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Board</button><button class="tab ${tab==='epics'?'on':''}" data-tab="epics">Epics</button>${isAdmin()?`<button class="tab ${tab==='time'?'on':''}" data-tab="time">Time</button>`:''}<button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
 }
 function importBanner(){
   if(epics===null||stories===null) return `<div class="banner">Loading board…</div>`;
@@ -198,16 +223,16 @@ function filtersHTML(){
 const visible=s=>filterA==="all"||(filterA==="none"?!s.assignee:filterA==="me"?(s.assignee&&s.assignee.email===(user.email||"").toLowerCase()):(s.assignee&&s.assignee.email===filterA));
 
 function cardHTML(s){
-  const open=openSet.has(s.id);
+  const open=openSet.has(s.id), spent=minsOf(s);
   return `<article class="card ${open?'open':''}" data-card="${esc(s.id)}" tabindex="0" aria-label="${esc(s.key)} ${esc(s.title)}">
-    <div class="card-top"><span class="key mono">${esc(s.key)}</span><span class="pri ${esc(s.priority)}">${esc(s.priority)}</span><span style="flex:1"></span>
+    <div class="card-top"><span class="key mono">${esc(s.key)}</span><span class="pri ${esc(s.priority)}">${esc(s.priority)}</span><span style="flex:1"></span>${spent?`<span class="tm mono" title="Time logged">${CLOCK}${fmtMin(spent)}</span>`:''}
       <button class="avbtn" data-assign="${esc(s.id)}" title="Assign">${avatarHTML(s.assignee,24)}</button></div>
     <div class="t">${esc(s.title)}</div>
     ${s.role&&!s.assignee?`<div class="oname">Role: ${esc(s.role)}</div>`:''}
-    <div class="card-actions"><button class="more" data-more="${esc(s.id)}">${open?'Hide story':'Show story'}</button><button class="more" data-move="${esc(s.id)}">Move to…</button><button class="more" data-edit-story="${esc(s.id)}">Edit</button></div>
+    <div class="card-actions"><button class="more" data-more="${esc(s.id)}">${open?'Hide story':'Show story'}</button><button class="more" data-move="${esc(s.id)}">Move to…</button><button class="more" data-log="${esc(s.id)}">Log time</button><button class="more" data-edit-story="${esc(s.id)}">Edit</button></div>
     ${open?`<dl class="detail"><dt>Story</dt><dd>As <b>${esc(s.as)}</b>, I want ${esc(s.want)}, so that ${esc(s.so)}.</dd>
       <dt>Details</dt><dd>${esc(s.details)}</dd><dt>Done when</dt><dd><ul>${(s.ac||[]).map(a=>`<li>${esc(a)}</li>`).join('')}</ul></dd>
-      ${s.role?`<dt>Role</dt><dd>${esc(s.role)}</dd>`:''}${s.updatedBy?`<dt>Updated</dt><dd>${esc(s.updatedBy)}</dd>`:''}</dl>`:''}
+      ${s.role?`<dt>Role</dt><dd>${esc(s.role)}</dd>`:''}<dt>Time</dt><dd>${spent?fmtMin(spent)+' logged':'Nothing logged yet'}</dd>${s.updatedBy?`<dt>Updated</dt><dd>${esc(s.updatedBy)}</dd>`:''}</dl>`:''}
   </article>`;
 }
 function boardHTML(){
@@ -230,10 +255,10 @@ function epicsHTML(){
   let h=`<div class="filters" style="max-width:1000px"><button class="chip" data-new-epic="1">+ New epic</button><span style="flex:1"></span><label class="chip" style="cursor:pointer"><input type="checkbox" data-show-archived ${showArchived?'checked':''} style="margin:0 6px 0 0">Show archived</label></div><div class="answers" style="max-width:1000px">`;
   if(!eps.length) h+=`<section><div class="sh">No epics yet</div><div class="ans"><div class="v empty">Create one with “+ New epic”, or import the defaults from the Board tab.</div></div></section>`;
   eps.forEach((e,i)=>{ const list=Object.values(stories||{}).filter(s=>s.epicId===e.id&&(showArchived||!s.archived)).sort(byOrder); const p=progress(list.filter(s=>!s.archived)); const es=epicStage(e.id);
-    h+=`<section class="${e.archived?'archived':''}"><div class="sh" style="display:block"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">${esc(e.name)}</b>${e.archived?'<span class="pri">Archived</span>':es?`<span class="pri">${esc(stageName(es))}</span>`:''}<span class="mono" style="font-weight:500;color:var(--ink-3)">${p.done}/${p.total}</span><span style="flex:1"></span>
+    h+=`<section class="${e.archived?'archived':''}"><div class="sh" style="display:block"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">${esc(e.name)}</b>${e.archived?'<span class="pri">Archived</span>':es?`<span class="pri">${esc(stageName(es))}</span>`:''}<span class="mono" style="font-weight:500;color:var(--ink-3)">${p.done}/${p.total}</span>${sumMin(list.map(s=>({minutes:minsOf(s)})))?`<span class="tm mono" title="Time logged">${CLOCK}${fmtMin(sumMin(list.map(s=>({minutes:minsOf(s)}))))}</span>`:''}<span style="flex:1"></span>
       <button class="chip" data-epic-up="${esc(e.id)}" ${i===0?'disabled':''}>↑</button><button class="chip" data-epic-down="${esc(e.id)}" ${i===eps.length-1?'disabled':''}>↓</button><button class="chip" data-new-story="${esc(e.id)}">+ Story</button><button class="chip" data-edit-epic="${esc(e.id)}">Edit</button></div>
       <div style="font-weight:400;font-size:12.5px;color:var(--ink-2);margin-top:6px">${esc(e.goal||'')}${e.role?` · Default role: ${esc(e.role)}`:''}</div><div style="margin-top:8px">${barHTML(p.done,p.doing,p.total)}</div></div>
-      ${list.map(s=>`<div class="ans ${s.archived?'archived':''}" style="grid-template-columns:auto 1fr auto auto"><span class="key mono">${esc(s.key)}</span><div><div class="v">${esc(s.title)}</div><div class="v" style="font-size:12px;color:var(--ink-3)">${esc(stageName(s.stage))} · ${esc(s.priority)}${s.role?' · '+esc(s.role):''}${s.archived?' · archived':''}</div></div>${avatarHTML(s.assignee,22)}<button class="more" data-edit-story="${esc(s.id)}">Edit</button></div>`).join('')}
+      ${list.map(s=>`<div class="ans ${s.archived?'archived':''}" style="grid-template-columns:auto 1fr auto auto auto"><span class="key mono">${esc(s.key)}</span><div><div class="v">${esc(s.title)}</div><div class="v" style="font-size:12px;color:var(--ink-3)">${esc(stageName(s.stage))} · ${esc(s.priority)}${s.role?' · '+esc(s.role):''}${minsOf(s)?' · '+fmtMin(minsOf(s))+' logged':''}${s.archived?' · archived':''}</div></div>${avatarHTML(s.assignee,22)}<button class="more" data-log="${esc(s.id)}">Log time</button><button class="more" data-edit-story="${esc(s.id)}">Edit</button></div>`).join('')}
       ${!list.length?`<div class="ans"><div class="v empty">No stories yet.</div></div>`:''}</section>`; });
   return h+`</div>`;
 }
@@ -255,6 +280,36 @@ function answersHTML(){
     h+=`</section>`;});
   return h+`</div>`;
 }
+/* ---- Time tab (admins): totals, per person, per epic, per task -------------------- */
+function periodStart(){ const d=new Date(); if(timeP==="week"){ d.setDate(d.getDate()-((d.getDay()+6)%7)); return ymd(d); } if(timeP==="month"){ d.setDate(1); return ymd(d); } return ""; }
+function timeEntries(){ const from=periodStart(); const rows=[];
+  Object.values(stories||{}).forEach(s=>logsOf(s).forEach(l=>{ if(from&&(l.date||"")<from) return; if(timeWho!=="all"&&l.email!==timeWho) return; rows.push({...l,story:s}); }));
+  return rows.sort((a,b)=>cmp(b.date||"",a.date||"")||(b.at||0)-(a.at||0)); }
+function timeHTML(){
+  if(stories===null) return `<div class="banner">Loading…</div>`;
+  const rows=timeEntries(), total=sumMin(rows);
+  const everyone={}; Object.values(stories).forEach(s=>logsOf(s).forEach(l=>{ everyone[l.email]=personName(l); }));
+  const chip=(attr,id,label,on)=>`<button class="chip ${on?'on':''}" data-${attr}="${esc(id)}">${esc(label)}</button>`;
+  const group=(keyFn)=>{ const g={}; rows.forEach(r=>{ const k=keyFn(r); (g[k]=g[k]||[]).push(r); }); return Object.entries(g).map(([k,list])=>({k,list,min:sumMin(list)})).sort((a,b)=>b.min-a.min); };
+  const byPerson=group(r=>r.email), byEpic=group(r=>r.story.epicId), byTask=group(r=>r.story.id);
+  const share=m=>`<div class="bar" style="margin-top:6px"><i class="p" style="width:${total?m/total*100:0}%"></i></div>`;
+  let h=`<div class="filters" style="max-width:1000px"><span class="fl">Period</span>${chip("tp","all","All time",timeP==="all")}${chip("tp","week","This week",timeP==="week")}${chip("tp","month","This month",timeP==="month")}
+    <span class="fl" style="margin-left:10px">Person</span>${chip("tw","all","Everyone",timeWho==="all")}${Object.entries(everyone).map(([e,n])=>chip("tw",e,n,timeWho===e)).join('')}<span style="flex:1"></span><button class="chip" data-csv="1" ${rows.length?'':'disabled'}>Export CSV</button></div>
+    <div class="tiles"><div class="tile"><span>Total time spent</span><b class="mono">${fmtMin(total)}</b></div><div class="tile"><span>Tasks with time</span><b class="mono">${byTask.length}</b></div><div class="tile"><span>People</span><b class="mono">${byPerson.length}</b></div><div class="tile"><span>Entries</span><b class="mono">${rows.length}</b></div></div>
+    <div class="answers" style="max-width:1000px">`;
+  if(!rows.length) return h+`<section><div class="sh">No time logged${timeP!=="all"||timeWho!=="all"?' for this filter':' yet'}</div><div class="ans"><div class="v empty">Use “Log time” on any card on the Board. Entries show up here straight away.</div></div></section></div>`;
+  h+=`<section><div class="sh">By person<span class="mono">${fmtMin(total)}</span></div>${byPerson.map(g=>`<div class="ans" style="grid-template-columns:auto 1fr auto"><span>${avatarHTML({email:g.k,name:personName(g.list[0])},22)}</span><div><div class="v">${esc(personName(g.list[0]))}</div><div class="v" style="font-size:12px;color:var(--ink-3)">${g.list.length} entr${g.list.length===1?'y':'ies'} · ${new Set(g.list.map(r=>r.story.id)).size} task(s)</div>${share(g.min)}</div><b class="mono">${fmtMin(g.min)}</b></div>`).join('')}</section>`;
+  h+=`<section><div class="sh">By epic<span class="mono">${fmtMin(total)}</span></div>${byEpic.map(g=>`<div class="ans" style="grid-template-columns:1fr auto"><div><div class="v">${esc((epics&&epics[g.k]||{}).name||'(no epic)')}</div>${share(g.min)}</div><b class="mono">${fmtMin(g.min)}</b></div>`).join('')}</section>`;
+  h+=`<section><div class="sh">By task<span class="mono">${fmtMin(total)}</span></div>${byTask.map(g=>{ const s=g.list[0].story; const ppl={}; g.list.forEach(r=>{ const n=personName(r); ppl[n]=(ppl[n]||0)+(+r.minutes||0); });
+      return `<div class="ans ${s.archived?'archived':''}" style="grid-template-columns:auto 1fr auto auto auto"><span class="key mono">${esc(s.key)}</span><div><div class="v">${esc(s.title)}</div><div class="v" style="font-size:12px;color:var(--ink-3)">${esc((epics&&epics[s.epicId]||{}).name||'')} · ${esc(stageName(s.stage))}${s.archived?' · archived':''} · last ${esc(g.list[0].date||'')}</div><div class="v" style="font-size:12px;color:var(--ink-2)">${Object.entries(ppl).map(([n,m])=>esc(n)+' '+fmtMin(m)).join(' · ')}</div></div>${avatarHTML(s.assignee,22)}<b class="mono">${fmtMin(g.min)}</b><button class="more" data-log="${esc(s.id)}">Entries</button></div>`; }).join('')}
+    <div class="ans" style="grid-template-columns:1fr auto"><b>Total</b><b class="mono">${fmtMin(total)}</b></div></section>`;
+  h+=`<section><div class="sh">Latest entries<span class="mono">${Math.min(rows.length,25)} of ${rows.length}</span></div>${rows.slice(0,25).map(r=>`<div class="ans" style="grid-template-columns:auto auto 1fr auto"><span class="mono" style="font-size:12px;color:var(--ink-3)">${esc(r.date||'')}</span><span class="key mono">${esc(r.story.key)}</span><div><div class="v">${esc(personName(r))}${r.note?' — '+esc(r.note):''}</div></div><b class="mono">${fmtMin(r.minutes)}</b></div>`).join('')}</section>`;
+  return h+`</div>`;
+}
+function exportCSV(){ const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+  const lines=[["Date","Key","Task","Epic","Stage","Person","Email","Minutes","Hours","Note"].map(q).join(",")].concat(timeEntries().map(r=>[r.date,r.story.key,r.story.title,(epics&&epics[r.story.epicId]||{}).name||"",stageName(r.story.stage),personName(r),r.email,r.minutes,(r.minutes/60).toFixed(2),r.note||""].map(q).join(",")));
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv"})); a.download="applebox-time-"+ymd(new Date())+".csv"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
 function loginHTML(msg){
   return `<header class="top"><div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">Internal · team members only</p></div></div></header>
   <section style="max-width:520px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px">
@@ -268,7 +323,8 @@ function teamHTML(){
   const emails=(team&&team.emails)||[]; const st=stages();
   const input='style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"';
   return `<div class="answers"><section><div class="sh">Team members (can open this board)</div>
-    ${emails.map(e=>`<div class="ans"><div class="q" style="display:flex;gap:8px;align-items:center">${avatarHTML({email:e},22)}${esc(e)}</div><div>${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
+    ${emails.map(e=>`<div class="ans"><div class="q" style="display:flex;gap:8px;align-items:center">${avatarHTML({email:e},22)}${esc(e)}${isAdminEmail(e)?' <span class="pri">Admin</span>':''}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${isAdmin()&&!BOOTSTRAP.includes(e.toLowerCase())?`<button class="chip" data-admin="${esc(e)}">${isAdminEmail(e)?'Remove admin':'Make admin'}</button>`:''}${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
+    <div class="ans"><div class="q">Admins</div><div class="v empty" style="font-size:12px">Admins see the Time tab (time per task, per person and the project total) and can delete any time entry. Everyone on the team can log time.</div></div>
     <div class="ans"><div class="q">Add a teammate</div><div><form data-add-email="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="email" required placeholder="their Gmail address" ${input}><button class="chip" type="submit">Add</button></form><div class="v empty" style="font-size:12px;margin-top:6px">They sign in with Google using this exact address.</div></div></div>
   </section>
   <section><div class="sh">Client access code</div>
@@ -288,7 +344,8 @@ function render(){
   if(!user){ root.innerHTML=loginHTML(authMsg); return; }
   if(!team){ root.innerHTML=loginHTML(teamErr||"Loading team list…"); return; }
   if(!isTeam()){ root.innerHTML=loginHTML(`${user.email} is not on the team list. Ask Danika to add you under “Team & access”.`); return; }
-  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='epics'?epicsHTML():tab==='team'?teamHTML():answersHTML());
+  if(tab==='time'&&!isAdmin()) tab='board';
+  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='epics'?epicsHTML():tab==='time'?timeHTML():tab==='team'?teamHTML():answersHTML());
 }
 
 /* ---- modal (replaces confirm()/prompt(); never blocks) ------------------------- */
@@ -321,6 +378,13 @@ function moveMenu(storyId){ const s=stories[storyId]; if(!s) return;
   openModal(`<h3>Move ${esc(s.key)}</h3><p class="hint">${esc(s.title)}</p><div class="menu">${stages().map(st=>`<button class="chip ${st.id===s.stage?'on':''}" data-move-to="${esc(st.id)}" data-story="${esc(s.id)}">${esc(st.name)}</button>`).join('')}</div><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button></div>`); }
 function assignMenu(storyId){ const s=stories[storyId]; if(!s) return; const cur=s.assignee&&s.assignee.email;
   openModal(`<h3>Assign ${esc(s.key)}</h3><p class="hint">${esc(s.title)}</p><div class="menu"><button class="chip ${!cur?'on':''}" data-assign-to="" data-story="${esc(s.id)}">Unassigned</button>${members().map(m=>`<button class="chip ${cur===m.email?'on':''}" data-assign-to="${esc(m.email)}" data-story="${esc(s.id)}">${avatarHTML({email:m.email},18)} ${esc(m.name)}</button>`).join('')}</div><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button></div>`); }
+function timeModal(storyId){ const s=stories[storyId]; if(!s) return; const me=(user.email||"").toLowerCase(), today=ymd(new Date());
+  const all=logsOf(s), list=isAdmin()?all:all.filter(l=>l.email===me);
+  openModal(`<h3>Log time · ${esc(s.key)}</h3><p class="hint">${esc(s.title)} · total logged <b>${fmtMin(minsOf(s))}</b></p>
+    <form data-log-form="${esc(s.id)}"><div class="row3">${fld("Hours",`<input type="number" name="h" min="0" max="24" step="1" inputmode="numeric" placeholder="0">`)}${fld("Minutes",`<input type="number" name="m" min="0" max="59" step="1" inputmode="numeric" placeholder="0">`)}${fld("Date",`<input type="date" name="date" required value="${today}" max="${today}">`)}</div>
+    ${fld("What did you work on? (optional)",`<input name="note" maxlength="200">`)}
+    <div class="actions"><span class="hint" data-log-err style="margin:0;color:#c0392b"></span><span style="flex:1"></span><button type="button" class="chip" data-close="1">Close</button><button type="submit" class="chip primary">Log time</button></div></form>
+    <div class="tlogs"><div class="hint" style="margin-bottom:4px">${isAdmin()?'All entries':'Your entries'} (${list.length})</div>${list.map(l=>`<div class="tlog"><span class="mono n">${esc(l.date||'')}</span><div>${esc(personName(l))}${l.note?`<div class="n">${esc(l.note)}</div>`:''}</div><b class="mono">${fmtMin(l.minutes)}</b>${isAdmin()||l.email===me?`<button class="more" data-del-log="${esc(l.id)}" data-story="${esc(s.id)}" style="color:#c0392b">Delete</button>`:'<span></span>'}</div>`).join('')||'<div class="n" style="font-size:12.5px;color:var(--ink-3)">Nothing logged yet.</div>'}</div>`); }
 function confirmEpicMove(epicId,stageId){ const e=epics[epicId]; const list=epicStories(epicId).filter(s=>s.stage!==stageId); if(!e) return;
   if(!list.length){ setConn("live","Nothing to move"); return; }
   openModal(`<h3>Move whole epic?</h3><p class="hint">Move <b>${list.length}</b> stor${list.length===1?'y':'ies'} of “${esc(e.name)}” to <b>${esc(stageName(stageId))}</b>? Stories already there stay where they are.</p><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button><button class="chip primary" data-epic-move="${esc(epicId)}" data-stage="${esc(stageId)}">Move ${list.length}</button></div>`); }
@@ -330,6 +394,17 @@ async function saveStory(id,patch,label){
   const prev={...stories[id]}; Object.assign(stories[id],patch); render(); setConn("saving","Saving…");
   try{ await S().merge("stories/"+id,patch,who); setConn("live","Saved · live"); }
   catch(e){ stories[id]=prev; render(); fail(e,label||"Save failed"); }
+}
+async function addLog(storyId,entry){ const s=stories[storyId]; if(!s) return; const lid="t"+uid();
+  s.logs={...(s.logs||{}),[lid]:entry}; render(); timeModal(storyId); setConn("saving","Saving…");
+  try{ await S().merge("stories/"+storyId,{logs:{[lid]:entry}},who); setConn("live",`Logged ${fmtMin(entry.minutes)} on ${s.key}`); }
+  catch(e){ const cur=stories[storyId]; if(cur&&cur.logs){ delete cur.logs[lid]; } render(); fail(e,"Log failed"); }
+}
+async function delLog(storyId,lid){ const s=stories[storyId]; const l=s&&s.logs&&s.logs[lid]; if(!l) return;
+  if(!isAdmin()&&l.email!==(user.email||"").toLowerCase()) return;
+  delete s.logs[lid]; render(); timeModal(storyId); setConn("saving","Deleting…");
+  try{ await S().removeFields("stories/"+storyId,["logs."+lid],who); setConn("live","Entry deleted"); }
+  catch(e){ const cur=stories[storyId]; if(cur) cur.logs={...(cur.logs||{}),[lid]:l}; render(); fail(e,"Delete failed"); }
 }
 function moveStory(id,stageId,prevId,nextId){
   const s=stories[id]; if(!s) return;
@@ -446,6 +521,12 @@ document.addEventListener('click',e=>{
   if(b=t.closest('[data-more]')){ const k=b.dataset.more; openSet.has(k)?openSet.delete(k):openSet.add(k); render(); return; }
   if(b=t.closest('[data-move]')){ moveMenu(b.dataset.move); return; }
   if(b=t.closest('[data-assign]')){ assignMenu(b.dataset.assign); return; }
+  if(b=t.closest('[data-log]')){ timeModal(b.dataset.log); return; }
+  if(b=t.closest('[data-del-log]')){ delLog(b.dataset.story,b.dataset.delLog); return; }
+  if(b=t.closest('[data-tp]')){ timeP=b.dataset.tp; render(); return; }
+  if(b=t.closest('[data-tw]')){ timeWho=b.dataset.tw; render(); return; }
+  if(t.closest('[data-csv]')){ exportCSV(); return; }
+  if(b=t.closest('[data-admin]')){ if(!isAdmin()) return; const em=b.dataset.admin.toLowerCase(), cur=((team.admins)||[]).map(x=>x.toLowerCase()); saveTeam({admins:cur.includes(em)?cur.filter(x=>x!==em):[...cur,em]}); return; }
   if(b=t.closest('[data-move-to]')){ closeModal(); moveStory(b.dataset.story,b.dataset.moveTo,null,null); return; }
   if(b=t.closest('[data-assign-to]')){ closeModal(); const m=memberOf(b.dataset.assignTo); saveStory(b.dataset.story,{assignee:m?{email:m.email,name:m.name}:null},"Assign failed"); return; }
   if(b=t.closest('[data-epic-move]')){ closeModal(); moveEpic(b.dataset.epicMove,b.dataset.stage); return; }
@@ -472,6 +553,10 @@ document.addEventListener('submit',async e=>{
   const f=e.target; if(!f.dataset) return; e.preventDefault(); const fd=new FormData(f); const v=k=>String(fd.get(k)||"").trim();
   if(f.dataset.storyForm!==undefined){ const m=memberOf(v("assignee")); const data={epicId:v("epicId"),title:v("title"),priority:v("priority"),stage:v("stage"),assignee:m?{email:m.email,name:m.name}:null,role:v("role"),as:v("as"),want:v("want"),so:v("so"),details:v("details"),ac:v("ac").split("\n").map(x=>x.trim()).filter(Boolean)};
     closeModal(); if(f.dataset.storyForm){ const id=f.dataset.storyForm; const old=stories[id]; if(old.stage!==data.stage){ const sib=liveStories().filter(x=>x.stage===data.stage&&x.epicId===data.epicId&&x.id!==id).sort(byOrder); data.order=between(sib.length?sib[sib.length-1].order:"",""); } saveStory(id,data); } else await createStory(data); return; }
+  if(f.dataset.logForm){ const minutes=(parseInt(v("h"),10)||0)*60+(parseInt(v("m"),10)||0), date=v("date"); const err=f.querySelector('[data-log-err]');
+    if(minutes<=0||minutes>1440){ err.textContent=minutes<=0?"Enter hours or minutes.":"One entry can be 24 hours at most."; return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>ymd(new Date())){ err.textContent="Pick today or an earlier date."; return; }
+    const me=memberOf(user.email); await addLog(f.dataset.logForm,{email:(user.email||"").toLowerCase(),name:(me&&me.name)||who||user.email,minutes,date,note:v("note").slice(0,200),at:Date.now()}); return; }
   if(f.dataset.epicForm!==undefined){ const data={name:v("name"),goal:v("goal"),role:v("role")}; closeModal(); if(f.dataset.epicForm){ const id=f.dataset.epicForm; Object.assign(epics[id],data); render(); S().merge("epics/"+id,data,who).catch(err=>fail(err,"Save failed")); } else await createEpic(data); return; }
   if(f.dataset.addEmail){ const em=(f.querySelector('input').value||"").trim().toLowerCase(); if(em&&!team.emails.includes(em)) await saveTeam({emails:[...team.emails,em]}); return; }
   if(f.dataset.setCode){ const c=codeSlug(f.querySelector('input').value); if(c.length<6) return; teamBusy="Saving…"; render();

@@ -93,6 +93,21 @@ body.dragging-any{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .tlogs{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .tlog{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
 .tlog:last-child{border-bottom:0} .tlog .n{color:var(--ink-3);font-size:12px}
+/* invoice sheet */
+.invoice{max-width:860px;margin:0 auto 24px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:32px;font-size:13px}
+.invoice h2{margin:0;font-size:24px;letter-spacing:.08em}
+.inv-top{display:flex;justify-content:space-between;gap:20px;margin-bottom:24px} .inv-from{font-size:18px;font-weight:800}
+.inv-sub{white-space:pre-line;color:var(--ink-2);font-size:12.5px;margin-top:4px}
+.inv-meta{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;margin-bottom:22px}
+.inv-meta span,.inv-notes>span{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:3px}
+.invoice table{width:100%;border-collapse:collapse} .invoice th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);text-align:left;border-bottom:2px solid var(--ink);padding:6px 8px}
+.invoice td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top} .invoice .r{text-align:right;white-space:nowrap}
+.invoice tfoot td{border-bottom:0;padding:5px 8px} .invoice tr.tot td{font-size:16px;font-weight:800;border-top:2px solid var(--ink);padding-top:10px}
+.invoice table.small td{padding:4px 8px;font-size:12px} .inv-notes{margin-top:22px;white-space:pre-line}
+@media (max-width:640px){.invoice{padding:16px}.inv-meta{grid-template-columns:1fr}}
+@media print{:root{--ink:#111;--ink-2:#333;--ink-3:#666;--line:#ccc;--bg:#fff;--surface:#fff}
+  header.top,nav.tabs,.noprint,#modal{display:none!important} body{background:#fff!important;padding:0!important}
+  .invoice{border:0;max-width:none;margin:0;padding:0} .invoice tr{break-inside:avoid}}
 .tabs{overflow-x:auto;flex-wrap:nowrap} .tab{white-space:nowrap;flex-shrink:0}
 @media (max-width:640px){.ans{grid-template-columns:1fr}.kanban{grid-auto-columns:88vw;gap:10px}.col-h{position:static}.tabs .mono,.tabs span:not(.fl){display:none}}
 </style>
@@ -152,6 +167,7 @@ let answers=null, person=null, delArm=null;
 let tab=localStorage.getItem("ab-tab")||"board", filterA=localStorage.getItem("ab-filter")||"all";
 let who=localStorage.getItem("ab-who")||"", conn="off", connMsg="Connecting…";
 let openSet=new Set(), collapsed=new Set(JSON.parse(localStorage.getItem("ab-collapsed")||"[]")), showArchived=false;
+let billing=null, invoices=null, invView=null, invDelArm=false;   // Invoices tab
 let timeP="all", timeWho="all";                  // Time tab filters: period, person
 let drag=null;                                   // active drag, see startDrag()
 const BOOTSTRAP=["danika.saranda@gmail.com","saranda.danika@gmail.com"];
@@ -208,7 +224,7 @@ function header(){
       <div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="e.g. Danika"></div>
       <div class="status ${conn}"><i></i>${esc(connMsg)}</div>
     </div></header>
-    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Board</button><button class="tab ${tab==='epics'?'on':''}" data-tab="epics">Epics</button>${isAdmin()?`<button class="tab ${tab==='time'?'on':''}" data-tab="time">Time</button>`:''}<button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
+    <nav class="tabs"><button class="tab ${tab==='board'?'on':''}" data-tab="board">Board</button><button class="tab ${tab==='epics'?'on':''}" data-tab="epics">Epics</button>${isAdmin()?`<button class="tab ${tab==='time'?'on':''}" data-tab="time">Time</button><button class="tab ${tab==='invoices'?'on':''}" data-tab="invoices">Invoices</button>`:''}<button class="tab ${tab==='answers'?'on':''}" data-tab="answers">Client answers</button><button class="tab ${tab==='team'?'on':''}" data-tab="team">Team &amp; access</button><span style="flex:1"></span><span style="font-size:12px;color:var(--ink-3);align-self:center;padding:0 10px">${esc(user?user.email:'')}</span><button class="tab" data-signout="1">Sign out</button></nav>`;
 }
 function importBanner(){
   if(epics===null||stories===null) return `<div class="banner">Loading board…</div>`;
@@ -316,6 +332,105 @@ function exportCSV(){ const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
   const lines=[["Date","Key","Task","Epic","Stage","Person","Email","Minutes","Hours","Note"].map(q).join(",")].concat(timeEntries().map(r=>[r.date,r.story.key,r.story.title,(epics&&epics[r.story.epicId]||{}).name||"",stageName(r.story.stage),personName(r),r.email,r.minutes,(r.minutes/60).toFixed(2),r.note||""].map(q).join(",")));
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv"})); a.download="applebox-time-"+ymd(new Date())+".csv"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
 
+/* ---- Invoices tab (admins): bill logged time -------------------------------------
+   board/billing   { currency, defaultRate, rates:{emailKey:rate}, taxPct, termsDays, nextNo,
+                     from:{name,address,contact}, client:{name,address,email}, notes }
+   board/inv-<id>  a frozen copy: { no, date, due, periodFrom, periodTo, from, client, currency,
+                     lines:[{storyId,key,title,minutes,rate,amount}], entries:[…], subtotal, taxPct, tax, total, status }
+   Every billed time entry gets logs.<id>.invoice = "<no>", so it is never billed twice. */
+const curCode=()=>(billing&&billing.currency)||"LKR";
+const money=(n,c)=>esc(c||curCode())+" "+(+n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const round2=n=>Math.round((+n||0)*100)/100;
+const hrs=m=>(Math.round((+m||0)/60*100)/100).toFixed(2);
+const invNo=n=>"INV-"+String(n||1).padStart(3,"0");
+const rateFor=email=>{ const r=billing&&billing.rates&&billing.rates[emailKey(email)]; return +((r!=null&&r!=="")?r:(billing&&billing.defaultRate)||0)||0; };
+const addDays=(date,n)=>{ const d=new Date(date+"T12:00:00"); d.setDate(d.getDate()+n); return ymd(d); };
+function unbilled(from,to,whoEmail){ const rows=[];
+  Object.values(stories||{}).forEach(s=>logsOf(s).forEach(l=>{ if(l.invoice||!(+l.minutes>0)) return; if(from&&(l.date||"")<from) return; if(to&&(l.date||"")>to) return; if(whoEmail&&whoEmail!=="all"&&l.email!==whoEmail) return; rows.push({...l,story:s}); }));
+  return rows.sort((a,b)=>cmp(a.date||"",b.date||"")||(a.at||0)-(b.at||0)); }
+function buildLines(rows){ const g={};                                   // one line per task (and per rate, if people on it have different rates)
+  rows.forEach(r=>{ const rate=rateFor(r.email), k=r.story.id+"|"+rate; const x=g[k]=g[k]||{storyId:r.story.id,key:r.story.key,title:r.story.title,rate,minutes:0}; x.minutes+=(+r.minutes||0); });
+  const num=k=>parseInt(String(k||"").split("-")[1],10)||0;
+  return Object.values(g).map(x=>({...x,amount:round2(x.minutes/60*x.rate)})).sort((a,b)=>num(a.key)-num(b.key)||b.rate-a.rate); }
+const linesTotal=lines=>round2(lines.reduce((n,l)=>n+l.amount,0));
+
+function invoicesHTML(){
+  if(invoices===null||stories===null) return `<div class="banner">Loading…</div>`;
+  if(invView){ const inv=invoices.find(i=>i.id===invView); if(inv) return invoiceViewHTML(inv); invView=null; }
+  const ub=unbilled("","","all"), ubAmt=linesTotal(buildLines(ub)), noRate=!rateFor("")&&!Object.values((billing&&billing.rates)||{}).some(r=>+r>0);
+  const list=invoices.slice().sort((a,b)=>cmp(b.date||"",a.date||"")||cmp(b.no||"",a.no||""));
+  const sumBy=st=>round2(list.filter(i=>i.status===st).reduce((n,i)=>n+(+i.total||0),0));
+  let h=`<div class="filters" style="max-width:1000px"><button class="chip primary" data-inv-new="1" ${ub.length?'':'disabled'}>+ New invoice</button><button class="chip" data-billing="1">Rates &amp; billing details</button></div>
+    ${noRate?`<div class="banner" style="max-width:1000px;margin:0 auto 14px">No hourly rate set yet — invoices would come out as ${money(0)}. Open “Rates &amp; billing details” first.</div>`:''}
+    <div class="tiles"><div class="tile"><span>Unbilled time</span><b class="mono">${fmtMin(sumMin(ub))}</b></div><div class="tile"><span>Unbilled value</span><b class="mono">${money(ubAmt)}</b></div><div class="tile"><span>Awaiting payment</span><b class="mono">${money(sumBy("sent"))}</b></div><div class="tile"><span>Paid</span><b class="mono">${money(sumBy("paid"))}</b></div></div>
+    <div class="answers" style="max-width:1000px"><section><div class="sh">Invoices<span class="mono">${list.length}</span></div>`;
+  if(!list.length) h+=`<div class="ans"><div class="v empty">${ub.length?'No invoices yet. “+ New invoice” turns the unbilled time into an invoice.':'No invoices yet, and no unbilled time. Log time on the Board first.'}</div></div>`;
+  list.forEach(i=>{ h+=`<div class="ans" style="grid-template-columns:auto 1fr auto auto auto"><span class="key mono">${esc(i.no)}</span><div><div class="v">${esc((i.client&&i.client.name)||'(no client name)')}</div><div class="v" style="font-size:12px;color:var(--ink-3)">${esc(i.date||'')} · ${esc(i.periodFrom||'')} – ${esc(i.periodTo||'')} · ${fmtMin(sumMin(i.lines||[]))}</div></div><span class="pri ${i.status==='paid'?'':i.status==='sent'?'High':'Highest'}">${esc(i.status||'draft')}</span><b class="mono">${money(i.total,i.currency)}</b><button class="more" data-inv-open="${esc(i.id)}">Open</button></div>`; });
+  return h+`</section></div>`;
+}
+function invoiceViewHTML(inv){ const c=inv.currency, f=inv.from||{}, cl=inv.client||{};
+  return `<div class="filters noprint" style="max-width:860px"><button class="chip" data-inv-back="1">← All invoices</button><span class="fl" style="margin-left:10px">Status</span>${["draft","sent","paid"].map(x=>`<button class="chip ${(inv.status||'draft')===x?'on':''}" data-inv-status="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}<span style="flex:1"></span><button class="chip primary" data-inv-print="1">Print / Save as PDF</button>${invDelArm?`<button class="chip" data-inv-del="${esc(inv.id)}" style="border-color:#c0392b;background:#c0392b;color:#fff">Yes, delete ${esc(inv.no)}</button><button class="chip" data-inv-delcancel="1">Cancel</button>`:`<button class="chip" data-inv-delarm="1" style="color:#c0392b">Delete</button>`}</div>
+  <article class="invoice">
+    <div class="inv-top"><div><div class="inv-from">${esc(f.name||'')}</div><div class="inv-sub">${esc([f.address,f.contact].filter(Boolean).join("\n"))}</div></div><div style="text-align:right"><h2>INVOICE</h2><div class="mono">${esc(inv.no)}</div></div></div>
+    <div class="inv-meta"><div><span>Bill to</span><b>${esc(cl.name||'')}</b><div class="inv-sub">${esc([cl.address,cl.email].filter(Boolean).join("\n"))}</div></div>
+      <div><span>Invoice date</span><b class="mono">${esc(inv.date||'')}</b><span style="margin-top:8px">Due date</span><b class="mono">${esc(inv.due||'')}</b></div>
+      <div><span>Work period</span><b class="mono">${esc(inv.periodFrom||'')} – ${esc(inv.periodTo||'')}</b></div></div>
+    <table><thead><tr><th>Task</th><th class="r">Hours</th><th class="r">Rate / h</th><th class="r">Amount</th></tr></thead><tbody>
+      ${(inv.lines||[]).map(l=>`<tr><td><span class="key mono">${esc(l.key)}</span> ${esc(l.title)}</td><td class="r mono">${hrs(l.minutes)}</td><td class="r mono">${money(l.rate,c)}</td><td class="r mono">${money(l.amount,c)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td></td><td class="r mono">${hrs(sumMin(inv.lines||[]))}</td><td class="r">Subtotal</td><td class="r mono">${money(inv.subtotal,c)}</td></tr>
+      ${+inv.taxPct?`<tr><td></td><td></td><td class="r">Tax ${esc(inv.taxPct)}%</td><td class="r mono">${money(inv.tax,c)}</td></tr>`:''}
+      <tr class="tot"><td></td><td></td><td class="r">Total</td><td class="r mono">${money(inv.total,c)}</td></tr></tfoot></table>
+    ${inv.notes?`<div class="inv-notes"><span>Notes</span>${esc(inv.notes)}</div>`:''}
+    ${(inv.entries||[]).length?`<div class="inv-notes"><span>Time details</span><table class="small"><tbody>${inv.entries.map(e=>`<tr><td class="mono">${esc(e.date)}</td><td class="mono">${esc(e.key)}</td><td>${esc(e.name)}${e.note?' — '+esc(e.note):''}</td><td class="r mono">${fmtMin(e.minutes)}</td></tr>`).join('')}</tbody></table></div>`:''}
+  </article>`;
+}
+function invSummary(f){ const fd=new FormData(f); const rows=unbilled(String(fd.get("from")||""),String(fd.get("to")||""),String(fd.get("who")||"all")); const sub=linesTotal(buildLines(rows)), tax=round2(sub*(parseFloat(fd.get("taxPct"))||0)/100);
+  f.querySelector('[data-inv-sum]').innerHTML=rows.length?`<b>${rows.length}</b> unbilled entr${rows.length===1?'y':'ies'} · <b>${fmtMin(sumMin(rows))}</b> · total <b>${money(round2(sub+tax))}</b>`:'No unbilled time for this selection.';
+  f.querySelector('[type=submit]').disabled=!rows.length; }
+function invoiceForm(){ const b=billing||{}, cl=b.client||{}, today=ymd(new Date());
+  openModal(`<h3>New invoice</h3><p class="hint">Bills every time entry in the period that is not on an invoice yet.</p><form data-invoice-form="1">
+    <div class="row3">${fld("Invoice no.",`<input name="no" required value="${esc(invNo(b.nextNo))}">`)}${fld("Invoice date",`<input type="date" name="date" required value="${today}">`)}${fld("Due date",`<input type="date" name="due" value="${addDays(today,+b.termsDays||14)}">`)}</div>
+    <div class="row3">${fld("Work from (empty = from the start)",`<input type="date" name="from">`)}${fld("Work until",`<input type="date" name="to" value="${today}">`)}${fld("Person",`<select name="who"><option value="all">Everyone</option>${members().map(m=>`<option value="${esc(m.email)}">${esc(m.name)}</option>`).join('')}</select>`)}</div>
+    <div class="row">${fld("Client name",`<input name="cname" required value="${esc(cl.name||'')}">`)}${fld("Client email",`<input name="cemail" value="${esc(cl.email||'')}">`)}</div>
+    ${fld("Client address",`<textarea name="caddr" rows="2">${esc(cl.address||'')}</textarea>`)}
+    <div class="row">${fld("Tax %",`<input type="number" name="taxPct" min="0" max="100" step="0.01" value="${esc(b.taxPct||0)}">`)}${fld("Notes (payment details, thank you…)",`<input name="notes" value="${esc(b.notes||'')}">`)}</div>
+    <p class="hint" data-inv-sum></p>
+    <div class="actions"><span class="hint" data-inv-err style="margin:0;color:#c0392b"></span><span style="flex:1"></span><button type="button" class="chip" data-close="1">Cancel</button><button type="submit" class="chip primary">Create invoice</button></div></form>`);
+  invSummary(document.querySelector('[data-invoice-form]')); }
+function billingForm(){ const b=billing||{}, f=b.from||{}, cl=b.client||{};
+  openModal(`<h3>Rates &amp; billing details</h3><form data-billing-form="1">
+    <div class="row3">${fld("Currency",`<input name="currency" required maxlength="5" value="${esc(curCode())}">`)}${fld("Default rate per hour",`<input type="number" name="defaultRate" min="0" step="0.01" value="${esc(b.defaultRate||'')}">`)}${fld("Tax % (0 = none)",`<input type="number" name="taxPct" min="0" max="100" step="0.01" value="${esc(b.taxPct||0)}">`)}</div>
+    <p class="hint">Rate per person (leave empty to use the default rate)</p>
+    ${members().map(m=>`<div class="row">${fld(esc(m.name)+" · "+esc(m.email),`<input type="number" name="rate:${esc(m.email)}" min="0" step="0.01" value="${esc(((b.rates||{})[emailKey(m.email)])??'')}" placeholder="${esc(b.defaultRate||0)}">`)}</div>`).join('')}
+    <p class="hint">Your business (printed at the top of the invoice)</p>
+    <div class="row">${fld("Business name",`<input name="fname" value="${esc(f.name||'')}">`)}${fld("Email / phone",`<input name="fcontact" value="${esc(f.contact||'')}">`)}</div>
+    ${fld("Address",`<textarea name="faddr" rows="2">${esc(f.address||'')}</textarea>`)}
+    <p class="hint">Default client (pre-filled on every new invoice)</p>
+    <div class="row">${fld("Client name",`<input name="cname" value="${esc(cl.name||'')}">`)}${fld("Client email",`<input name="cemail" value="${esc(cl.email||'')}">`)}</div>
+    ${fld("Client address",`<textarea name="caddr" rows="2">${esc(cl.address||'')}</textarea>`)}
+    <div class="row">${fld("Payment terms (days)",`<input type="number" name="termsDays" min="0" max="365" step="1" value="${esc(b.termsDays??14)}">`)}${fld("Default notes (bank details…)",`<input name="notes" value="${esc(b.notes||'')}">`)}</div>
+    <div class="actions"><span style="flex:1"></span><button type="button" class="chip" data-close="1">Cancel</button><button type="submit" class="chip primary">Save</button></div></form>`); }
+async function createInvoice(d){
+  const rows=unbilled(d.from,d.to,d.who); if(!rows.length) throw new Error("No unbilled time for this selection.");
+  if((invoices||[]).some(i=>i.no===d.no)) throw new Error("Invoice "+d.no+" already exists.");
+  const lines=buildLines(rows), subtotal=linesTotal(lines), tax=round2(subtotal*d.taxPct/100), id="inv-"+uid();
+  const inv={no:d.no,date:d.date,due:d.due,periodFrom:d.from||rows[0].date,periodTo:d.to||rows[rows.length-1].date,from:(billing&&billing.from)||{},client:d.client,currency:curCode(),lines,
+    entries:rows.map(r=>({storyId:r.story.id,logId:r.id,date:r.date||"",key:r.story.key,name:personName(r),note:r.note||"",minutes:+r.minutes||0})),subtotal,taxPct:d.taxPct,tax,total:round2(subtotal+tax),notes:d.notes,status:"draft",createdAt:Date.now()};
+  const marks={}; rows.forEach(r=>{ (marks[r.story.id]=marks[r.story.id]||{})[r.id]={invoice:d.no}; });
+  const n=parseInt(String(d.no).replace(/\D+/g,""),10)||0;
+  const ops=[{op:"set",path:"board/"+id,data:inv},{op:"merge",path:"board/billing",data:{nextNo:Math.max(+((billing||{}).nextNo)||1,n)+1}},...Object.entries(marks).map(([sid,logs])=>({op:"merge",path:"stories/"+sid,data:{logs}}))];
+  setConn("saving","Creating invoice…"); await S().batch(ops,who);
+  rows.forEach(r=>{ const l=stories[r.story.id]&&stories[r.story.id].logs&&stories[r.story.id].logs[r.id]; if(l) l.invoice=d.no; });
+  if(!invoices.some(i=>i.id===id)) invoices.push({id,...inv}); invView=id; invDelArm=false; setConn("live","Invoice "+d.no+" created");
+}
+async function deleteInvoice(id){ const inv=(invoices||[]).find(i=>i.id===id); if(!inv) return;
+  const marks={}; (inv.entries||[]).forEach(e=>{ const l=stories[e.storyId]&&stories[e.storyId].logs&&stories[e.storyId].logs[e.logId]; if(l&&l.invoice===inv.no) (marks[e.storyId]=marks[e.storyId]||{})[e.logId]={invoice:null}; });
+  const ops=[{op:"delete",path:"board/"+id},...Object.entries(marks).map(([sid,logs])=>({op:"merge",path:"stories/"+sid,data:{logs}}))];
+  setConn("saving","Deleting…");
+  try{ await S().batch(ops,who); Object.entries(marks).forEach(([sid,logs])=>Object.keys(logs).forEach(lid=>{ stories[sid].logs[lid].invoice=null; })); invoices=invoices.filter(i=>i.id!==id); invView=null; invDelArm=false; setConn("live","Invoice deleted · its time is unbilled again"); render(); }
+  catch(e){ fail(e,"Delete failed"); }
+}
+
 function loginHTML(msg){
   return `<header class="top"><div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">Internal · team members only</p></div></div></header>
   <section style="max-width:520px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px">
@@ -350,8 +465,8 @@ function render(){
   if(!user){ root.innerHTML=loginHTML(authMsg); return; }
   if(!team){ root.innerHTML=loginHTML(teamErr||"Loading team list…"); return; }
   if(!isTeam()){ root.innerHTML=loginHTML(`${user.email} is not on the team list. Ask Danika to add you under “Team & access”.`); return; }
-  if(tab==='time'&&!isAdmin()) tab='board';
-  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='epics'?epicsHTML():tab==='time'?timeHTML():tab==='team'?teamHTML():answersHTML());
+  if((tab==='time'||tab==='invoices')&&!isAdmin()) tab='board';
+  root.innerHTML=header()+(tab==='board'?boardHTML():tab==='epics'?epicsHTML():tab==='time'?timeHTML():tab==='invoices'?invoicesHTML():tab==='team'?teamHTML():answersHTML());
 }
 
 /* ---- modal (replaces confirm()/prompt(); never blocks) ------------------------- */
@@ -390,7 +505,7 @@ function timeModal(storyId){ const s=stories[storyId]; if(!s) return; const me=(
     <form data-log-form="${esc(s.id)}"><div class="row3">${fld("Hours",`<input type="number" name="h" min="0" max="24" step="1" inputmode="numeric" placeholder="0">`)}${fld("Minutes",`<input type="number" name="m" min="0" max="59" step="1" inputmode="numeric" placeholder="0">`)}${fld("Date",`<input type="date" name="date" required value="${today}" max="${today}">`)}</div>
     ${fld("What did you work on? (optional)",`<input name="note" maxlength="200">`)}
     <div class="actions"><span class="hint" data-log-err style="margin:0;color:#c0392b"></span><span style="flex:1"></span><button type="button" class="chip" data-close="1">Close</button><button type="submit" class="chip primary">Log time</button></div></form>
-    <div class="tlogs"><div class="hint" style="margin-bottom:4px">${isAdmin()?'All entries':'Your entries'} (${list.length})</div>${list.map(l=>`<div class="tlog"><span class="mono n">${esc(l.date||'')}</span><div>${esc(personName(l))}${l.note?`<div class="n">${esc(l.note)}</div>`:''}</div><b class="mono">${fmtMin(l.minutes)}</b>${isAdmin()||l.email===me?`<button class="more" data-del-log="${esc(l.id)}" data-story="${esc(s.id)}" style="color:#c0392b">Delete</button>`:'<span></span>'}</div>`).join('')||'<div class="n" style="font-size:12.5px;color:var(--ink-3)">Nothing logged yet.</div>'}</div>`); }
+    <div class="tlogs"><div class="hint" style="margin-bottom:4px">${isAdmin()?'All entries':'Your entries'} (${list.length})</div>${list.map(l=>`<div class="tlog"><span class="mono n">${esc(l.date||'')}</span><div>${esc(personName(l))}${l.note?`<div class="n">${esc(l.note)}</div>`:''}</div><b class="mono">${fmtMin(l.minutes)}</b>${l.invoice?`<span class="n mono" title="Already invoiced">${esc(l.invoice)}</span>`:isAdmin()||l.email===me?`<button class="more" data-del-log="${esc(l.id)}" data-story="${esc(s.id)}" style="color:#c0392b">Delete</button>`:'<span></span>'}</div>`).join('')||'<div class="n" style="font-size:12.5px;color:var(--ink-3)">Nothing logged yet.</div>'}</div>`); }
 function confirmEpicMove(epicId,stageId){ const e=epics[epicId]; const list=epicStories(epicId).filter(s=>s.stage!==stageId); if(!e) return;
   if(!list.length){ setConn("live","Nothing to move"); return; }
   openModal(`<h3>Move whole epic?</h3><p class="hint">Move <b>${list.length}</b> stor${list.length===1?'y':'ies'} of “${esc(e.name)}” to <b>${esc(stageName(stageId))}</b>? Stories already there stay where they are.</p><div class="actions"><span style="flex:1"></span><button class="chip" data-close="1">Cancel</button><button class="chip primary" data-epic-move="${esc(epicId)}" data-stage="${esc(stageId)}">Move ${list.length}</button></div>`); }
@@ -407,6 +522,7 @@ async function addLog(storyId,entry){ const s=stories[storyId]; if(!s) return; c
   catch(e){ const cur=stories[storyId]; if(cur&&cur.logs){ delete cur.logs[lid]; } render(); fail(e,"Log failed"); }
 }
 async function delLog(storyId,lid){ const s=stories[storyId]; const l=s&&s.logs&&s.logs[lid]; if(!l) return;
+  if(l.invoice){ setConn("err","Entry is on invoice "+l.invoice); return; }
   if(!isAdmin()&&l.email!==(user.email||"").toLowerCase()) return;
   delete s.logs[lid]; render(); timeModal(storyId); setConn("saving","Deleting…");
   try{ await S().removeFields("stories/"+storyId,["logs."+lid],who); setConn("live","Entry deleted"); }
@@ -530,6 +646,15 @@ document.addEventListener('click',e=>{
   if(b=t.closest('[data-log]')){ timeModal(b.dataset.log); return; }
   if(b=t.closest('[data-del-log]')){ delLog(b.dataset.story,b.dataset.delLog); return; }
   if(t.closest('[data-csv]')){ exportCSV(); return; }
+  if(t.closest('[data-inv-new]')){ invoiceForm(); return; }
+  if(t.closest('[data-billing]')){ billingForm(); return; }
+  if(b=t.closest('[data-inv-open]')){ invView=b.dataset.invOpen; invDelArm=false; render(); window.scrollTo(0,0); return; }
+  if(t.closest('[data-inv-back]')){ invView=null; invDelArm=false; render(); return; }
+  if(t.closest('[data-inv-print]')){ window.print(); return; }
+  if(b=t.closest('[data-inv-status]')){ const inv=(invoices||[]).find(i=>i.id===invView); if(!inv) return; inv.status=b.dataset.invStatus; render(); setConn("saving","Saving…"); S().merge("board/"+inv.id,{status:inv.status},who).then(()=>setConn("live","Saved · live")).catch(err=>fail(err,"Save failed")); return; }
+  if(t.closest('[data-inv-delarm]')){ invDelArm=true; render(); return; }
+  if(t.closest('[data-inv-delcancel]')){ invDelArm=false; render(); return; }
+  if(b=t.closest('[data-inv-del]')){ deleteInvoice(b.dataset.invDel); return; }
   if(b=t.closest('[data-admin]')){ if(!isAdmin()) return; const em=b.dataset.admin.toLowerCase(), cur=((team.admins)||[]).map(x=>x.toLowerCase()); saveTeam({admins:cur.includes(em)?cur.filter(x=>x!==em):[...cur,em]}); return; }
   if(b=t.closest('[data-move-to]')){ closeModal(); moveStory(b.dataset.story,b.dataset.moveTo,null,null); return; }
   if(b=t.closest('[data-assign-to]')){ closeModal(); const m=memberOf(b.dataset.assignTo); saveStory(b.dataset.story,{assignee:m?{email:m.email,name:m.name}:null},"Assign failed"); return; }
@@ -561,6 +686,12 @@ document.addEventListener('submit',async e=>{
     if(minutes<=0||minutes>1440){ err.textContent=minutes<=0?"Enter hours or minutes.":"One entry can be 24 hours at most."; return; }
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>ymd(new Date())){ err.textContent="Pick today or an earlier date."; return; }
     const me=memberOf(user.email); await addLog(f.dataset.logForm,{email:(user.email||"").toLowerCase(),name:(me&&me.name)||who||user.email,minutes,date,note:v("note").slice(0,200),at:Date.now()}); return; }
+  if(f.dataset.invoiceForm){ if(!isAdmin()) return; const err=f.querySelector('[data-inv-err]');
+    try{ await createInvoice({no:v("no"),date:v("date"),due:v("due"),from:v("from"),to:v("to"),who:v("who")||"all",taxPct:parseFloat(v("taxPct"))||0,notes:v("notes"),client:{name:v("cname"),email:v("cemail"),address:v("caddr")}}); closeModal(); render(); window.scrollTo(0,0); }
+    catch(e2){ console.error(e2); err.textContent=e2.code||e2.message; setConn("err","Invoice not created"); } return; }
+  if(f.dataset.billingForm){ if(!isAdmin()) return; const rates={}; members().forEach(m=>{ const x=v("rate:"+m.email); rates[emailKey(m.email)]=x===""?"":(parseFloat(x)||0); });
+    const data={currency:(v("currency")||"LKR").toUpperCase(),defaultRate:parseFloat(v("defaultRate"))||0,taxPct:parseFloat(v("taxPct"))||0,termsDays:parseInt(v("termsDays"),10)||0,notes:v("notes"),rates,from:{name:v("fname"),contact:v("fcontact"),address:v("faddr")},client:{name:v("cname"),email:v("cemail"),address:v("caddr")}};
+    billing={...(billing||{}),...data}; closeModal(); render(); setConn("saving","Saving…"); S().merge("board/billing",data,who).then(()=>setConn("live","Saved · live")).catch(e2=>fail(e2,"Save failed")); return; }
   if(f.dataset.epicForm!==undefined){ const data={name:v("name"),goal:v("goal"),role:v("role")}; closeModal(); if(f.dataset.epicForm){ const id=f.dataset.epicForm; Object.assign(epics[id],data); render(); S().merge("epics/"+id,data,who).catch(err=>fail(err,"Save failed")); } else await createEpic(data); return; }
   if(f.dataset.addEmail){ const em=(f.querySelector('input').value||"").trim().toLowerCase(); if(em&&!team.emails.includes(em)) await saveTeam({emails:[...team.emails,em]}); return; }
   if(f.dataset.setCode){ const c=codeSlug(f.querySelector('input').value); if(c.length<6) return; teamBusy="Saving…"; render();
@@ -575,14 +706,16 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-time-p]')){ timeP=e.target.value; render(); }
   if(e.target.matches('[data-time-w]')){ timeWho=e.target.value; render(); }
 });
+document.addEventListener('input',e=>{ const f=e.target.closest&&e.target.closest('[data-invoice-form]'); if(f) invSummary(f); });
 
 /* ---- boot: auth → team → live data ------------------------------------------------ */
-let profileSynced=false, unTeam=null, unMeta=null, unEpics=null, unStories=null, unAns=null, lastAnsPath=null;
-function stopAll(){ [unMeta,unEpics,unStories,unAns].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
+let profileSynced=false, unTeam=null, unMeta=null, unEpics=null, unStories=null, unAns=null, unBoard=null, lastAnsPath=null;
+function stopAll(){ [unMeta,unEpics,unStories,unAns,unBoard].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=unBoard=null; billing=null; invoices=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
 function startData(){
   if(unMeta) return;
   const S_=S(); const onErr=err=>{ setConn("err","Connection error: "+err.code); };
   unMeta=S_.watch("board/meta",d=>{ meta=d||{}; render(); },onErr);
+  unBoard=S_.watchCollection("board",list=>{ billing=list.find(d=>d.id==="billing")||{}; invoices=list.filter(d=>d.id.startsWith("inv-")); if(tab==='invoices') render(); },onErr);
   unEpics=S_.watchCollection("epics",list=>{ epics=Object.fromEntries(list.map(e=>[e.id,e])); render(); },onErr);
   unStories=S_.watchCollection("stories",list=>{ stories=Object.fromEntries(list.map(s=>[s.id,s])); const last=list.map(s=>s.updatedBy).filter(Boolean).pop(); if(conn!=="saving"){ conn="live"; connMsg=last?`Live · last change by ${last}`:"Live"; } render(); },onErr);
 }

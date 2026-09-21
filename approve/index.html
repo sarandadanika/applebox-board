@@ -38,25 +38,32 @@ const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const emailKey=e=>String(e||"").toLowerCase().replace(/\./g,",");
 const mask=e=>{ const [a,b]=String(e).split("@"); return (a||"").slice(0,2)+"•••@"+(b||""); };
-const token=(location.hash||"").replace(/[^a-f0-9]/g,"");
+let token=(location.hash||"").replace(/[^a-f0-9]/g,"");
 const S=()=>window.AppleBoxStore;
 let user=undefined, req=undefined, mode=null, draft="", busy=false, errMsg="", authErr="", un=null, shownVideo="";
+/* "My approval history": every approver keeps their own list at intake/aph-<their Firebase uid>. The uid is
+   only known to the signed-in person and these documents cannot be listed, so nobody else can find it.
+   items.<token> = { title, videoId, version, firstAt, lastAt, log:{ id:{version,decision,comment,at} } } */
+let hist=undefined, unHist=null, liveReq={}, seenSaved="";
+const histPath=()=>"intake/aph-"+user.uid;
 
 const me=()=>((user&&user.email)||"").toLowerCase();
-const decisions=()=>(req.approvers||[]).map(e=>{ const d=(req.decisions||{})[emailKey(e)]; return {email:e,d:d&&d.version===req.version?d:null}; });
-const needed=()=>{ const n=(req.approvers||[]).length; return req.rule&&req.rule.type==="count"?Math.max(1,Math.min(+req.rule.count||1,n)):n; };
-function status(){ if(req.status==="published"||req.status==="cancelled") return req.status; if(req.overridden) return "approved";
-  const ds=decisions(); if(ds.some(x=>x.d&&x.d.decision==="changes")) return "changes"; return ds.filter(x=>x.d&&x.d.decision==="approved").length>=needed()?"approved":"review"; }
-const mine=()=>{ const d=(req.decisions||{})[emailKey(me())]; return d&&d.version===req.version?d:null; };
+const decisions=(r=req)=>(r.approvers||[]).map(e=>{ const d=(r.decisions||{})[emailKey(e)]; return {email:e,d:d&&d.version===r.version?d:null}; });
+const needed=(r=req)=>{ const n=(r.approvers||[]).length; return r.rule&&r.rule.type==="count"?Math.max(1,Math.min(+r.rule.count||1,n)):n; };
+function status(r=req){ if(r.status==="published"||r.status==="cancelled") return r.status; if(r.overridden) return "approved";
+  const ds=decisions(r); if(ds.some(x=>x.d&&x.d.decision==="changes")) return "changes"; return ds.filter(x=>x.d&&x.d.decision==="approved").length>=needed(r)?"approved":"review"; }
+const mine=(r=req)=>{ const d=(r.decisions||{})[emailKey(me())]; return d&&d.version===r.version?d:null; };
+const ST={review:["Waiting for approval",""],changes:["Rejected · changes requested","no"],approved:["Approved","ok"],published:["Published","ok"],cancelled:["Cancelled",""]};
+const when=t=>t?new Date(t).toLocaleString():"";
 const canDecide=()=>req.status==="review"&&!req.overridden&&(req.approvers||[]).includes(me());
 
 const head=`<header class="top" style="margin-bottom:16px"><div class="brand">${logo}<div><h1>Apple Box — video approval</h1><p class="sub">Please review this video before it goes public</p></div></div></header>`;
 function shell(inner){ document.getElementById('root').innerHTML=head+inner; shownVideo=""; }
 function render(){
-  if(!token) return shell(`<div class="box">This link is incomplete. Please open the full link from the message you received.</div>`);
   if(user===undefined) return shell(`<div class="box muted">Checking sign-in…</div>`);
   if(!user) return shell(`<div class="box"><div class="title" style="font-size:17px">Sign in to review the video</div><p class="muted" style="margin:6px 0 14px">Use the Google (Gmail) account that the Apple Box team has for you. It only confirms who is approving — nothing is posted anywhere.</p>
     <div class="row"><button class="btn dark" data-signin="1">Sign in with Google</button></div>${authErr?`<div class="err">${esc(authErr)}<br>If the sign-in window does not open, open this link in Chrome or Safari instead of inside WhatsApp.</div>`:''}</div>`);
+  if(!token) return shell(histHTML());
   if(req===undefined) return shell(`<div class="box muted">Loading…</div>`);
   if(!req||req.kind!=="approval") return shell(`<div class="box">This approval link is no longer valid. The request may have been removed — please ask the Apple Box team for a new link.</div>${account()}`);
   if(!(req.approvers||[]).includes(me())) return shell(`<div class="box"><div class="title" style="font-size:17px">This review is not shared with ${esc(user.email)}</div><p class="muted" style="margin:6px 0 0">It was sent to: ${(req.approvers||[]).map(mask).map(esc).join(", ")}. Sign in with that Google account, or ask the Apple Box team to add this address.</p></div>${account()}`);
@@ -65,7 +72,30 @@ function render(){
     shownVideo=req.videoId+"|"+req.version; }
   document.getElementById('body').innerHTML=bodyHTML();
 }
-const account=()=>`<div class="muted" style="text-align:center;margin:18px 0">Signed in as ${esc(user.email)} · <a href="#" data-signout="1">use another account</a></div>`;
+const account=()=>`<div class="muted" style="text-align:center;margin:18px 0">${token?'<a href="#" data-hist="1">My approval history</a> · ':''}Signed in as ${esc(user.email)} · <a href="#" data-signout="1">use another account</a></div>`;
+const decRow=d=>`<div class="dec"><div>Version ${esc(d.version)}${d.comment?`<div style="white-space:pre-wrap;color:var(--ink-2)">${esc(d.comment)}</div>`:''}<div class="muted" style="font-size:11.5px">${esc(when(d.at))}</div></div><span class="pill ${d.decision==="approved"?'ok':'no'}">${d.decision==="approved"?'You approved':'You rejected'}</span></div>`;
+function histHTML(){
+  if(hist===undefined) return `<div class="box muted">Loading your history…</div>`;
+  const items=Object.entries(hist.items||{}).sort((a,b)=>(b[1].lastAt||0)-(a[1].lastAt||0));
+  let h=`<div class="box"><div class="title" style="font-size:17px">My approval history</div><p class="sub">Every video you were asked to review with this Google account, newest first.</p></div>`;
+  if(!items.length) h+=`<div class="box muted">Nothing here yet. Videos appear after you open an approval link from the Apple Box team.</div>`;
+  items.forEach(([t,it])=>{ const live=liveReq[t], m=live&&mine(live), log=Object.values(it.log||{}).sort((a,b)=>(b.at||0)-(a.at||0)), st=live?ST[status(live)]:null;
+    const todo=live&&live.status==="review"&&!live.overridden&&!m&&(live.approvers||[]).includes(me());
+    h+=`<div class="box"><div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start"><img src="https://i.ytimg.com/vi/${esc((live&&live.videoId)||it.videoId)}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:112px;height:63px;object-fit:cover;border-radius:6px;background:var(--surface-2)">
+      <div><b>${esc((live&&live.title)||it.title)}</b> <span class="muted">v${esc((live&&live.version)||it.version)}</span>
+        <div style="margin:4px 0">${live===undefined?'<span class="pill">Checking…</span>':live===null?'<span class="pill">Request removed</span>':`<span class="pill ${st[1]}">${st[0]}</span>`}${todo?' <span class="pill no">Your decision is needed</span>':''}</div>
+        <div class="muted">First opened ${esc(when(it.firstAt))}</div></div></div>
+      ${log.length?`<div style="margin-top:10px">${log.map(decRow).join('')}</div>`:'<div class="muted" style="margin-top:8px">You have not decided on this video.</div>'}
+      ${live?`<div class="row" style="margin-top:10px"><button class="btn" data-open="${esc(t)}" style="flex:0 0 auto;min-height:38px;padding:8px 14px;font-size:13.5px">${todo?'Review now':'Open'}</button></div>`:''}</div>`; });
+  return h+account(); }
+function loadLive(){ Object.keys((hist&&hist.items)||{}).forEach(t=>{ if(t in liveReq) return; liveReq[t]=undefined;       // current state of each request in my history
+  S().get("intake/apr-"+t).then(d=>{ liveReq[t]=d&&d.kind==="approval"?d:null; if(!token) render(); }).catch(()=>{ liveReq[t]=null; if(!token) render(); }); }); }
+function noteSeen(){ if(!req||req.kind!=="approval"||!hist||!(req.approvers||[]).includes(me())) return;                      // remember this request in my history
+  const k=token+"|"+req.version+"|"+req.title; if(seenSaved===k) return; seenSaved=k; const old=(hist.items||{})[token];
+  S().merge(histPath(),{kind:"approver-history",email:me(),items:{[token]:{title:req.title||"",videoId:req.videoId||"",version:req.version,firstAt:(old&&old.firstAt)||Date.now(),lastAt:Date.now()}}},user.displayName||me()).catch(e=>console.error(e)); }
+function go(t){ token=t||""; try{ history.pushState(null,"",token?"#"+token:location.pathname); }catch(e){} mode=null; draft=""; errMsg=""; openReq(); window.scrollTo(0,0); }
+function openReq(){ if(un){ un(); un=null; } req=undefined; render(); if(!user) return; if(!token){ loadLive(); return; }
+  un=S().watch("intake/apr-"+token,d=>{ req=d; liveReq[token]=d&&d.kind==="approval"?d:null; noteSeen(); if(!mode) render(); },err=>{ req=null; render(); }); }
 function bodyHTML(){ const st=status(), m=mine(), ds=decisions(), ok=ds.filter(x=>x.d&&x.d.decision==="approved").length;
   let h=`<div class="box"><div class="title">${esc(req.title)}</div><p class="sub">Version ${esc(req.version)}${req.uploader?' · uploaded by '+esc(req.uploader):''}${req.publishAt?' · planned publish '+esc(String(req.publishAt).replace("T"," ")):''} · <a href="${esc(req.url)}" target="_blank" rel="noopener">open on YouTube</a></p>
     ${req.note?`<p class="sub">What changed in this version: ${esc(req.note)}</p>`:''}
@@ -79,6 +109,8 @@ function bodyHTML(){ const st=status(), m=mine(), ds=decisions(), ok=ds.filter(x
     else h+=`${m?`<div class="flag ${m.decision==="approved"?'ok':'no'}">You ${m.decision==="approved"?'approved':'rejected'} this video${m.comment?': “'+esc(m.comment)+'”':''}. You can change your decision until it is published.</div>`:`<div class="flag wait">Your decision is needed</div>`}
       <div class="box"><h3>Your decision</h3><p class="muted" style="margin:0 0 12px">Watch the video above, then choose. You can add a comment in the next step.</p><div class="row"><button class="btn ok" data-mode="approved">Approve</button><button class="btn no" data-mode="changes">Reject / request changes</button></div></div>`;
   }
+  const past=Object.values(req.dlog||{}).filter(d=>d.email===me()).sort((a,b)=>(b.at||0)-(a.at||0));
+  if(past.length>1||(past.length===1&&!m)) h+=`<div class="box"><h3>Your earlier decisions on this video</h3>${past.map(decRow).join('')}</div>`;
   h+=`<div class="box"><h3>Approvers · ${ok} of ${needed()} needed approvals</h3>${ds.map(x=>`<div class="dec"><div><b>${esc((x.d&&x.d.name)||(x.email===me()?user.displayName||x.email:mask(x.email)))}</b>${x.email===me()?' <span class="muted">(you)</span>':''}${x.d&&x.d.comment?`<div style="white-space:pre-wrap;color:var(--ink-2)">${esc(x.d.comment)}</div>`:''}${x.d?`<div class="muted" style="font-size:11.5px">${new Date(x.d.at).toLocaleString()}</div>`:''}</div><span class="pill ${x.d?(x.d.decision==="approved"?'ok':'no'):''}">${x.d?(x.d.decision==="approved"?'Approved':'Rejected'):'Waiting'}</span></div>`).join('')}
     <p class="muted" style="margin:10px 0 0">${st==="approved"?'Approved — the team can now publish it.':st==="changes"?'Rejected — the team will upload a corrected version and ask again.':'The team publishes only after approval.'}</p></div>`;
   return h+account(); }
@@ -86,6 +118,8 @@ function bodyHTML(){ const st=status(), m=mine(), ds=decisions(), ok=ds.filter(x
 document.addEventListener('click',async e=>{ const t=e.target; let b;
   if(t.closest('[data-signin]')){ authErr=""; S().signIn().catch(err=>{ authErr="Sign-in failed: "+(err.code||err.message); render(); }); return; }
   if(t.closest('[data-signout]')){ e.preventDefault(); S().signOut(); return; }
+  if(t.closest('[data-hist]')){ e.preventDefault(); go(""); return; }
+  if(b=t.closest('[data-open]')){ go(b.dataset.open); return; }
   if(b=t.closest('[data-mode]')){ mode=b.dataset.mode; const m=mine(); draft=m&&m.decision===mode?(m.comment||""):""; errMsg=""; render(); const c=document.getElementById('comment'); if(c) c.focus(); return; }
   if(t.closest('[data-back]')){ mode=null; errMsg=""; render(); return; }
   if(t.closest('[data-confirm]')){ const comment=draft.trim(); if(!canDecide()) return;
@@ -93,7 +127,8 @@ document.addEventListener('click',async e=>{ const t=e.target; let b;
     const entry={version:req.version,decision:mode,comment:comment.slice(0,2000),name:user.displayName||user.email,email:me(),at:Date.now()};
     busy=true; errMsg=""; render();
     try{ await S().merge("intake/apr-"+token,{decisions:{[emailKey(me())]:entry},dlog:{["d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)]:entry}},entry.name);
-      req.decisions={...(req.decisions||{}),[emailKey(me())]:entry}; mode=null; draft=""; }
+      req.decisions={...(req.decisions||{}),[emailKey(me())]:entry}; mode=null; draft="";
+      S().merge(histPath(),{items:{[token]:{title:req.title||"",videoId:req.videoId||"",version:req.version,lastAt:entry.at,log:{["d"+entry.at.toString(36)]:{version:entry.version,decision:entry.decision,comment:entry.comment,at:entry.at}}}}},entry.name).catch(e2=>console.error(e2)); }
     catch(err){ errMsg="Could not save: "+(err.code||err.message); }
     busy=false; render(); window.scrollTo({top:document.getElementById('body').offsetTop-10,behavior:"smooth"}); }
 });
@@ -101,9 +136,11 @@ document.addEventListener('input',e=>{ if(e.target.id==='comment') draft=e.targe
 
 document.addEventListener('applebox-store-ready',()=>{
   if(!S().configured){ user=null; authErr="Not connected — please try again later."; render(); return; }
-  S().onAuth(u=>{ user=u||null; if(un){ un(); un=null; } req=undefined; mode=null; render(); if(!user||!token) return;
-    un=S().watch("intake/apr-"+token,d=>{ req=d; if(!mode) render(); },err=>{ req=null; render(); }); });
+  S().onAuth(u=>{ user=u||null; if(unHist){ unHist(); unHist=null; } hist=undefined; liveReq={}; seenSaved=""; mode=null;
+    if(user) unHist=S().watch(histPath(),d=>{ hist=d||{}; if(!token){ loadLive(); render(); } else noteSeen(); },err=>{ hist={}; if(!token) render(); });
+    openReq(); });
 });
+window.addEventListener('hashchange',()=>{ const t=(location.hash||"").replace(/[^a-f0-9]/g,""); if(t!==token){ token=t; mode=null; openReq(); } });
 render();
 </script>
 </body>

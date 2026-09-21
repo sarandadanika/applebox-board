@@ -178,7 +178,7 @@ let answers=null, person=null, delArm=null;
 let tab=localStorage.getItem("ab-tab")||"board", filterA=localStorage.getItem("ab-filter")||"all";
 let who=localStorage.getItem("ab-who")||"", conn="off", connMsg="Connecting…";
 let openSet=new Set(), collapsed=new Set(JSON.parse(localStorage.getItem("ab-collapsed")||"[]")), showArchived=false;
-let videos=null, vidView=null, vidArm=false;                      // Approvals tab
+let videos=null, vidView=null, vidArm=false, vidDelArm=false;                      // Approvals tab
 let billing=null, invoices=null, invView=null, invDelArm=false;   // Invoices tab
 let timeP="all", timeWho="all";                  // Time tab filters: period, person
 let drag=null;                                   // active drag, see startDrag()
@@ -481,7 +481,7 @@ async function vidSave(id,patch,action,detail){                       // optimis
   const v=(videos||[]).find(x=>x.id===id); if(v) deepMerge(v,JSON.parse(JSON.stringify(full))); else videos.push({id,...JSON.parse(JSON.stringify(full))});
   render(); setConn("saving","Saving…");
   try{ await S().merge("board/"+id,full,who); setConn("live","Saved · live"); }catch(e){ fail(e,"Save failed"); } }
-function openVid(id){ vidView=id; vidArm=false; try{ history.replaceState(null,"",id?"#v="+id:location.pathname+location.search); }catch(e){} render(); window.scrollTo(0,0); }
+function openVid(id){ vidView=id; vidArm=false; vidDelArm=false; try{ history.replaceState(null,"",id?"#v="+id:location.pathname+location.search); }catch(e){} render(); window.scrollTo(0,0); }
 
 function approvalsHTML(){
   if(videos===null) return `<div class="banner">Loading…</div>`;
@@ -522,7 +522,9 @@ function vidPanelHTML(v){ const st=vidStatus(v), c=vidCur(v), ds=vidDecisions(v)
       ${st==="approved"?`<div style="font-size:12.5px;margin-bottom:8px">1. Open YouTube Studio and switch the video from Unlisted to <b>Public</b> (or schedule it). 2. Come back and mark it as published.</div><div class="menu"><a class="chip" href="https://studio.youtube.com/video/${esc(c.videoId)}/edit" target="_blank" rel="noopener">Open in YouTube Studio</a><button class="chip primary" data-vid-publish="1">Mark as published</button></div>`:''}
       <div class="menu" style="margin:0"><a class="chip" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp</a><a class="chip" href="mailto:${esc((pending.length?pending:v.approvers||[]).join(","))}?subject=${encodeURIComponent("Please review: "+v.title)}&body=${encodeURIComponent(msg)}">Email${pending.length?' the '+pending.length+' waiting':''}</a><button class="chip" data-vid-copy="1">Copy message</button></div>
       <div class="menu" style="margin:10px 0 0"><button class="chip" data-vid-version="1">Add new version</button><button class="chip" data-vid-edit="1">Edit</button>${isAdmin()&&st!=="approved"?'<button class="chip" data-vid-override="1">Override…</button>':''}</div></div>`;
-    h+=`<div class="vbox"><div class="menu" style="margin:0">${vidArm?`<button class="chip" data-vid-cancel="1" style="border-color:#c0392b;background:#c0392b;color:#fff">Yes, cancel this request</button><button class="chip" data-vid-cancelno="1">Keep it</button>`:`<button class="chip" data-vid-cancelarm="1" style="color:#c0392b">Cancel request</button>`}</div></div>`; }
+  }
+  const canDel=manage&&(isAdmin()||st!=="published"), active=st!=="published"&&st!=="cancelled";   // published requests are the audit record: only an admin may delete them
+  if(manage&&(active||canDel)) h+=`<div class="vbox"><div class="menu" style="margin:0">${vidDelArm?`<button class="chip" data-vid-del="1" style="border-color:#c0392b;background:#c0392b;color:#fff">Yes, delete permanently</button><button class="chip" data-vid-cancelno="1">Keep it</button>`:vidArm?`<button class="chip" data-vid-cancel="1" style="border-color:#c0392b;background:#c0392b;color:#fff">Yes, cancel this request</button><button class="chip" data-vid-cancelno="1">Keep it</button>`:`${active?'<button class="chip" data-vid-cancelarm="1" style="color:#c0392b">Cancel request</button>':''}${canDel?'<button class="chip" data-vid-delarm="1" style="color:#c0392b">Delete request</button>':''}`}</div>${vidDelArm?'<div style="font-size:12px;color:var(--ink-3);margin-top:8px">This removes the request with all decisions, comments and history. The video on YouTube is not touched. To keep the record, use “Cancel request” instead.</div>':''}</div>`;
   if(st!=="draft") h+=`<div class="vbox"><h3>Pre-publish checklist</h3>${VID_CHECK.map(([k,l])=>`<div class="vhist">${(v.checklist||{})[k]?'✓':'–'} ${esc(l)}</div>`).join('')}</div>`;
   h+=`<div class="vbox"><h3>History</h3>${Object.values(v.history||{}).sort((a,b)=>(b.at||0)-(a.at||0)).map(x=>`<div class="vhist"><span class="mono">${new Date(x.at||0).toLocaleString()}</span> · <b>${esc(x.by)}</b> ${esc(x.action)}${x.detail?' — '+esc(x.detail):''}</div>`).join('')}</div>`;
   return h; }
@@ -761,8 +763,8 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-vid-new]')){ vidForm(null); return; }
   if(b=t.closest('[data-vid-open]')){ openVid(b.dataset.vidOpen); return; }
   if(t.closest('[data-vid-back]')){ openVid(null); return; }
-  if(t.closest('[data-vid-cancelno]')){ vidArm=false; render(); return; }
-  if(t.closest('[data-vid-send],[data-vid-edit],[data-vid-version],[data-vid-decide],[data-vid-publish],[data-vid-override],[data-vid-copy],[data-vid-check],[data-vid-cancelarm],[data-vid-cancel]')){
+  if(t.closest('[data-vid-cancelno]')){ vidArm=false; vidDelArm=false; render(); return; }
+  if(t.closest('[data-vid-send],[data-vid-edit],[data-vid-version],[data-vid-decide],[data-vid-publish],[data-vid-override],[data-vid-copy],[data-vid-check],[data-vid-cancelarm],[data-vid-cancel],[data-vid-delarm],[data-vid-del]')){
     const v=(videos||[]).find(x=>x.id===vidView); if(!v) return; const c=vidCur(v);
     if(b=t.closest('[data-vid-decide]')){ if(!canDecide(v)) return; const ch=b.dataset.vidDecide==="changes", mine=myDecision(v);
       vidSimpleForm(ch?'Request changes':'Approve this video',esc(v.title)+' · version '+esc(v.version),`data-vid-decide-form="${b.dataset.vidDecide}"`,fld(ch?"What needs to change? (you can mention the time, e.g. 02:15)":"Comment (optional)",`<textarea name="comment" rows="4" ${ch?'required':''}>${esc(mine&&mine.decision===b.dataset.vidDecide?mine.comment:'')}</textarea>`),ch?'Request changes':'Approve'); return; }
@@ -774,6 +776,9 @@ document.addEventListener('click',e=>{
     if(t.closest('[data-vid-version]')){ vidSimpleForm('Add new version','YouTube cannot replace a video file, so the corrected video is a new unlisted upload. Approvals start again.','data-vid-version-form="1"',fld("New YouTube link (unlisted)",`<input name="url" required placeholder="https://youtu.be/…">`)+fld("What changed?",`<input name="note" maxlength="200">`),'Add version'); return; }
     if(t.closest('[data-vid-publish]')){ if(vidStatus(v)!=="approved") return; vidSimpleForm('Mark as published','Do this after you switched the video to Public in YouTube Studio.','data-vid-publish-form="1"',fld("Public link",`<input name="url" required value="https://youtu.be/${esc(c.videoId)}">`),'Mark as published'); return; }
     if(t.closest('[data-vid-override]')){ if(!isAdmin()) return; vidSimpleForm('Approve by override','Use only in an emergency. Your name and the reason stay on this request permanently.','data-vid-override-form="1"',fld("Reason",`<textarea name="reason" rows="3" required></textarea>`),'Override and approve'); return; }
+    if(t.closest('[data-vid-delarm]')){ vidDelArm=true; vidArm=false; render(); return; }
+    if(t.closest('[data-vid-del]')){ if(!isAdmin()&&vidStatus(v)==="published") return; const keep=videos; videos=videos.filter(x=>x.id!==v.id); openVid(null); setConn("saving","Deleting…");
+      S().batch([{op:"delete",path:"board/"+v.id}],who).then(()=>setConn("live","Request deleted")).catch(err=>{ videos=keep; render(); fail(err,"Delete failed"); }); return; }
     if(t.closest('[data-vid-cancelarm]')){ vidArm=true; render(); return; }
     if(t.closest('[data-vid-cancel]')){ vidArm=false; vidSave(v.id,{status:"cancelled"},"cancelled the request"); return; }
   }

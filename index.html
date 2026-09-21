@@ -226,14 +226,14 @@ const barHTML=(done,doing,total)=>`<div class="bar"><i class="d" style="width:${
 function progress(list){ const d=doneId(); const done=list.filter(s=>s.stage===d).length; const doing=list.filter(s=>s.stage!==d&&s.stage!=="backlog"&&s.stage!=="todo").length; return {done,doing,total:list.length}; }
 
 function header(){
-  const all=liveStories(); const p=progress(all); const ao=approverOnly();
+  const all=liveStories(); const p=progress(all);
   const tb=(id,label)=>`<button class="tab ${tab===id?'on':''}" data-tab="${id}">${label}</button>`;
-  const wait=(videos||[]).filter(v=>canDecide(v)&&!myDecision(v)).length;
-  const tabs=ao?[["approvals","Approvals"]]:[["board","Board"],["epics","Epics"],["approvals","Approvals"],...(isAdmin()?[["time","Time"],["invoices","Invoices"]]:[]),["answers","Client answers"],["team","Team &amp; access"]];
+  const wait=(videos||[]).filter(v=>vidStatus(v)==="approved").length;        // approved, waiting for you to publish
+  const tabs=[["board","Board"],["epics","Epics"],["approvals","Approvals"],...(isAdmin()?[["time","Time"],["invoices","Invoices"]]:[]),["answers","Client answers"],["team","Team &amp; access"]];
   return `<header class="top">
-    <div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">${ao?'Video approvals · @appleboxlk':'Internal · YouTube, Facebook, Instagram, TikTok setup · @appleboxlk'}</p></div></div>
+    <div class="brand">${logo}<div><h1>Apple Box Launch Board</h1><p class="sub">Internal · YouTube, Facebook, Instagram, TikTok setup · @appleboxlk</p></div></div>
     <div class="summary">
-      <div class="meter" ${ao?'hidden':''}><div class="meter-label"><span>Overall</span><b class="mono">${p.done} / ${p.total} done</b></div>${barHTML(p.done,p.doing,p.total)}
+      <div class="meter"><div class="meter-label"><span>Overall</span><b class="mono">${p.done} / ${p.total} done</b></div>${barHTML(p.done,p.doing,p.total)}
       <div class="legend"><span class="ld">Done ${p.done}</span><span class="lp">In progress ${p.doing}</span><span class="lt">Not started ${p.total-p.done-p.doing}</span></div>
       ${isAdmin()?`<div class="meter-label"><span>Time logged</span><b class="mono">${fmtMin(sumMin(Object.values(stories||{}).map(s=>({minutes:minsOf(s)}))))}</b></div>`:''}</div>
       <div class="who"><label for="who">Your name</label><input id="who" type="text" value="${esc(who)}" placeholder="e.g. Danika"></div>
@@ -458,45 +458,55 @@ const VID_CHECK=[["meta","Title and description are final"],["thumb","Thumbnail 
 const VID_LABEL={draft:"Draft",review:"In review",changes:"Changes requested",approved:"Approved",published:"Published",cancelled:"Cancelled"};
 const myEmail=()=>((user&&user.email)||"").toLowerCase();
 const myName=()=>{ const m=memberOf(myEmail()); return (m&&m.name)||who||myEmail(); };
-const isApproverEmail=e=>((team&&team.approvers)||[]).map(x=>x.toLowerCase()).includes((e||"").toLowerCase());
-const selfOk=()=>!!(team&&team.selfApprove);                       // Team & access: may an uploader approve their own video?
-const approverOnly=()=>!!user&&isApproverEmail(user.email)&&!isAdmin();
+/* Approvers are NOT team members and never open this board. Each request has a public copy at
+   intake/apr-<token> (readable only with the secret link, like the client checklist). The separate
+   page approve/#<token> shows that copy after Google sign-in and writes decisions.<emailKey> and
+   dlog.<id> into it. The board watches the copy (mirrors[token]) and reads the decisions from there. */
+let mirrors={}, unMirrors={};
+const newToken=()=>[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,"0")).join("");
+const mirrorOf=v=>(v.token&&mirrors[v.token])||{};
+const allDecisions=v=>({...(v.decisions||{}),...(mirrorOf(v).decisions||{})});
+const vidMirror=v=>{ const c=vidCur(v); return {kind:"approval",title:v.title||"",description:v.description||"",publishAt:v.publishAt||"",version:v.version,url:c.url||"",videoId:c.videoId||"",note:c.note||"",
+  approvers:v.approvers||[],rule:v.rule||{type:"all"},status:v.status,overridden:!!v.override,uploader:(v.createdBy&&v.createdBy.name)||""}; };
+function syncMirrors(){
+  (videos||[]).filter(v=>!v.token&&v.status!=="draft"&&canManage(v)).forEach(v=>{ v.token=newToken();      // requests sent before the approver page existed
+    S().merge("board/"+v.id,{token:v.token},who).then(()=>S().merge("intake/apr-"+v.token,vidMirror(v),who)).catch(e=>console.error(e)); });
+  const want=new Set((videos||[]).filter(v=>v.token).map(v=>v.token));
+  Object.keys(unMirrors).forEach(t=>{ if(!want.has(t)){ unMirrors[t](); delete unMirrors[t]; delete mirrors[t]; } });
+  want.forEach(t=>{ if(!unMirrors[t]) unMirrors[t]=S().watch("intake/apr-"+t,d=>{ mirrors[t]=d||{}; if(tab==='approvals') render(); },err=>console.error(err)); }); }
 const ytId=u=>{ const m=String(u||"").match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})/); return m?m[1]:""; };
 const vidCur=v=>(v.versions||{})[v.version]||{};
-const vidDecisions=v=>(v.approvers||[]).map(e=>{ const d=(v.decisions||{})[emailKey(e)]; return {email:e,d:d&&d.version===v.version?d:null}; });
+const vidDecisions=v=>(v.approvers||[]).map(e=>{ const d=allDecisions(v)[emailKey(e)]; return {email:e,d:d&&d.version===v.version?d:null}; });
 const vidNeeded=v=>{ const n=(v.approvers||[]).length; return v.rule&&v.rule.type==="count"?Math.max(1,Math.min(+v.rule.count||1,n)):n; };
 const vidApprovals=v=>vidDecisions(v).filter(x=>x.d&&x.d.decision==="approved").length;
 function vidStatus(v){ if(v.status==="draft"||v.status==="published"||v.status==="cancelled") return v.status; if(v.override) return "approved";
   const ds=vidDecisions(v); if(ds.some(x=>x.d&&x.d.decision==="changes")) return "changes"; return ds.length&&vidApprovals(v)>=vidNeeded(v)?"approved":"review"; }
-const myDecision=v=>{ const d=(v.decisions||{})[emailKey(myEmail())]; return d&&d.version===v.version?d:null; };
-const canManage=v=>!approverOnly()&&(isAdmin()||(v.createdBy&&v.createdBy.email===myEmail()));
-const canDecide=v=>(v.approvers||[]).includes(myEmail())&&(selfOk()||!(v.createdBy&&v.createdBy.email===myEmail()))&&!v.override&&["review","changes","approved"].includes(vidStatus(v));
-const vidLink=v=>location.origin+location.pathname+"#v="+v.id;
+const canManage=v=>isAdmin()||(v.createdBy&&v.createdBy.email===myEmail());
+const vidLink=v=>location.origin+location.pathname.replace(/[^/]*$/,"")+"approve/#"+(v.token||"");
 const vidWhen=s=>s?String(s).replace("T"," "):"";
-const vidMsg=v=>`Please review “${v.title}” for the Apple Box YouTube channel${v.publishAt?` (planned publish: ${vidWhen(v.publishAt)})`:''}. Watch it and approve or request changes here: ${vidLink(v)}`;
+const vidMsg=v=>`Please review “${v.title}” for the Apple Box YouTube channel${v.publishAt?` (planned publish: ${vidWhen(v.publishAt)})`:''}. Open this link, sign in with your Google (Gmail) account, watch the video and approve or reject it with a comment: ${vidLink(v)}`;
 const stPill=st=>`<span class="pri st ${st}">${VID_LABEL[st]||st}</span>`;
 function deepMerge(t,p){ Object.entries(p).forEach(([k,x])=>{ if(x&&typeof x==="object"&&!Array.isArray(x)&&t[k]&&typeof t[k]==="object"&&!Array.isArray(t[k])) deepMerge(t[k],x); else t[k]=x; }); return t; }
 async function vidSave(id,patch,action,detail){                       // optimistic; every change also writes one history entry
   const full=JSON.parse(JSON.stringify({...patch,history:{["h"+uid()]:{at:Date.now(),by:myName(),email:myEmail(),action,detail:detail||""}}}));
   const v=(videos||[]).find(x=>x.id===id); if(v) deepMerge(v,JSON.parse(JSON.stringify(full))); else videos.push({id,...JSON.parse(JSON.stringify(full))});
+  const cur=videos.find(x=>x.id===id); if(!cur.token){ cur.token=full.token=newToken(); }        // requests made before the approver page existed
   render(); setConn("saving","Saving…");
-  try{ await S().merge("board/"+id,full,who); setConn("live","Saved · live"); }catch(e){ fail(e,"Save failed"); } }
+  try{ await S().merge("board/"+id,full,who); if(cur.status!=="draft") await S().merge("intake/apr-"+cur.token,vidMirror(cur),who); syncMirrors(); setConn("live","Saved · live"); }catch(e){ fail(e,"Save failed"); } }
 function openVid(id){ vidView=id; vidArm=false; vidDelArm=false; try{ history.replaceState(null,"",id?"#v="+id:location.pathname+location.search); }catch(e){} render(); window.scrollTo(0,0); }
 
 function approvalsHTML(){
   if(videos===null) return `<div class="banner">Loading…</div>`;
-  if(vidView){ const v=videos.find(x=>x.id===vidView); if(v&&(!approverOnly()||((v.approvers||[]).includes(myEmail())&&v.status!=="draft"))) return vidViewHTML(v); vidView=null; }
-  const ao=approverOnly(), me=myEmail(), today=ymd(new Date());
-  const mine=videos.filter(v=>ao?((v.approvers||[]).includes(me)&&!["draft","cancelled"].includes(vidStatus(v))):true).sort((a,b)=>cmp(a.publishAt||"9",b.publishAt||"9")||(b.createdAt||0)-(a.createdAt||0));
+  if(vidView){ const v=videos.find(x=>x.id===vidView); if(v) return vidViewHTML(v); vidView=null; }
+  const today=ymd(new Date());
+  const mine=videos.slice().sort((a,b)=>cmp(a.publishAt||"9",b.publishAt||"9")||(b.createdAt||0)-(a.createdAt||0));
   const row=v=>{ const c=vidCur(v), st=vidStatus(v), soon=v.publishAt&&["review","changes"].includes(st)&&v.publishAt.slice(0,10)<=addDays(today,2);
     return `<div class="ans" style="grid-template-columns:auto 1fr auto auto"><img class="vthumb" src="https://i.ytimg.com/vi/${esc(c.videoId)}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer"><div><div class="v"><b>${esc(v.title)}</b> <span class="mono" style="color:var(--ink-3);font-size:11px">v${esc(v.version)}</span></div><div class="v" style="font-size:12px;color:var(--ink-3)">${v.publishAt?'Publish '+esc(vidWhen(v.publishAt))+' · ':''}${st==='draft'?'not sent yet':vidApprovals(v)+' of '+vidNeeded(v)+' approvals'} · by ${esc((v.createdBy&&v.createdBy.name)||'')}${soon?' · <b style="color:var(--accent)">publish date is close</b>':''}</div></div>${stPill(st)}<button class="more" data-vid-open="${esc(v.id)}">Open</button></div>`; };
   const sec=(title,list,empty)=>list.length||empty?`<section><div class="sh">${title}<span class="mono">${list.length}</span></div>${list.map(row).join('')||`<div class="ans"><div class="v empty">${empty}</div></div>`}</section>`:'';
-  const waiting=mine.filter(v=>canDecide(v)&&!myDecision(v)), rest=mine.filter(v=>!waiting.includes(v)), by=st=>rest.filter(v=>vidStatus(v)===st);
-  const noAppr=!((team&&team.approvers)||[]).length;
-  return `${ao?'':`<div class="filters" style="max-width:1000px"><button class="chip primary" data-vid-new="1">+ New approval request</button><span style="font-size:12px;color:var(--ink-3)">Upload the video to YouTube as <b>Unlisted</b> first, then paste its link here.</span></div>`}
-    ${noAppr&&!ao?`<div class="banner" style="max-width:1000px;margin:0 auto 14px">No approvers yet. Add the directors under “Team &amp; access”, then press “Make approver” next to each of them.</div>`:''}
-    <div class="answers" style="max-width:1000px">${isApproverEmail(me)?sec("Waiting for your decision",waiting,"Nothing is waiting for you."):''}${sec("Changes requested",by("changes"))}${sec("In review",by("review"))}${sec("Approved · ready to publish",by("approved"))}${sec("Drafts",by("draft"))}${sec("Published",by("published").slice(0,30))}${ao?'':sec("Cancelled",by("cancelled"))}
-    ${!mine.length&&!isApproverEmail(me)?`<section><div class="sh">No approval requests yet</div><div class="ans"><div class="v empty">Create one with “+ New approval request”.</div></div></section>`:''}</div>`;
+  const by=st=>mine.filter(v=>vidStatus(v)===st);
+  return `<div class="filters" style="max-width:1000px"><button class="chip primary" data-vid-new="1">+ New approval request</button><span style="font-size:12px;color:var(--ink-3)">Upload the video to YouTube as <b>Unlisted</b> first, then paste its link here. Approvers get a private link — they never see this board.</span></div>
+    <div class="answers" style="max-width:1000px">${sec("Approved · ready to publish",by("approved"))}${sec("Rejected · changes requested",by("changes"))}${sec("In review",by("review"))}${sec("Drafts",by("draft"))}${sec("Published",by("published").slice(0,30))}${sec("Cancelled",by("cancelled"))}
+    ${!mine.length?`<section><div class="sh">No approval requests yet</div><div class="ans"><div class="v empty">Create one with “+ New approval request”.</div></div></section>`:''}</div>`;
 }
 function vidViewHTML(v){ const c=vidCur(v);
   return `<div class="filters" style="max-width:1200px"><button class="chip" data-vid-back="1">← All requests</button></div>
@@ -506,35 +516,34 @@ function vidInfoHTML(v){ const c=vidCur(v), vs=Object.entries(v.versions||{}).so
     <div style="font-size:12px;color:var(--ink-3);margin:4px 0 10px">Version ${esc(v.version)} · uploaded by ${esc((v.createdBy&&v.createdBy.name)||'')}${v.publishAt?' · planned publish '+esc(vidWhen(v.publishAt)):''}${v.storyKey?' · '+esc(v.storyKey):''} · <a href="${esc(c.url)}" target="_blank" rel="noopener">open on YouTube</a></div>
     <h3>Description that will go live</h3><div style="white-space:pre-wrap">${esc(v.description||'—')}</div></div>
     ${vs.length>1?`<div class="vbox"><h3>Versions</h3>${vs.map(([n,x])=>`<div class="vhist"><b>v${esc(n)}</b> · ${new Date(x.at||0).toLocaleString()} · ${esc(x.by||'')}${x.note?' — '+esc(x.note):''} · <a href="${esc(x.url)}" target="_blank" rel="noopener">link</a></div>`).join('')}</div>`:''}`; }
-function vidPanelHTML(v){ const st=vidStatus(v), c=vidCur(v), ds=vidDecisions(v), mine=myDecision(v), manage=canManage(v), checks=VID_CHECK.every(([k])=>(v.checklist||{})[k]);
+function vidPanelHTML(v){ const st=vidStatus(v), c=vidCur(v), ds=vidDecisions(v), manage=canManage(v), checks=VID_CHECK.every(([k])=>(v.checklist||{})[k]);
   const pending=ds.filter(x=>!x.d).map(x=>x.email), msg=vidMsg(v);
   let h=`<div class="vbox">${st==="published"?`<div class="vflag ok">Published${v.published&&v.published.at?' · '+new Date(v.published.at).toLocaleString():''}</div>`:st==="approved"?`<div class="vflag ok">Approved — ready to publish</div>`:st==="cancelled"?`<div class="vflag no">Cancelled</div>`:`<div class="vflag no">Not approved — do not publish</div>`}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${stPill(st)}<span style="font-size:12px;color:var(--ink-2)">${st==="draft"?'Not sent to the approvers yet':`${vidApprovals(v)} of ${vidNeeded(v)} needed approvals (${v.rule&&v.rule.type==="count"?'at least '+vidNeeded(v)+' of '+ds.length:'all '+ds.length})`}</span></div>
     ${v.override?`<div style="margin-top:8px;font-size:12.5px"><b>Approved by override</b> · ${esc(v.override.by)} · ${new Date(v.override.at).toLocaleString()}<br>Reason: ${esc(v.override.reason)}</div>`:''}
     ${st==="published"&&v.published?`<div style="margin-top:8px"><a href="${esc(v.published.url)}" target="_blank" rel="noopener">${esc(v.published.url)}</a></div>`:''}</div>`;
-  if(canDecide(v)) h+=`<div class="vbox"><h3>Your decision</h3>${mine?`<div style="margin-bottom:8px;font-size:12.5px">You chose <b>${mine.decision==="approved"?'Approve':'Request changes'}</b>. You can change it until the video is published.</div>`:`<div style="margin-bottom:8px;font-size:12.5px">Watch the video, then choose.</div>`}<div class="menu" style="margin:0"><button class="chip primary" data-vid-decide="approved" style="background:var(--done);border-color:var(--done)">Approve</button><button class="chip" data-vid-decide="changes" style="color:var(--accent);border-color:var(--accent)">Request changes</button></div></div>`;
-  else if(!selfOk()&&(v.createdBy&&v.createdBy.email===myEmail())&&isApproverEmail(myEmail())) h+=`<div class="vbox" style="font-size:12.5px;color:var(--ink-2)">You uploaded this video, so you cannot approve it yourself.</div>`;
-  h+=`<div class="vbox"><h3>Approvers</h3>${ds.map(x=>{ const m=memberOf(x.email), n=(m&&m.name)||(x.d&&x.d.name)||x.email; return `<div class="vdec">${avatarHTML({email:x.email,name:n},24)}<div><b>${esc(n)}</b>${x.d&&x.d.comment?`<div style="white-space:pre-wrap;color:var(--ink-2);margin-top:2px">${esc(x.d.comment)}</div>`:''}${x.d?`<div style="font-size:11px;color:var(--ink-3)">${new Date(x.d.at).toLocaleString()}</div>`:''}</div>${x.d?stPill(x.d.decision==="approved"?"approved":"changes").replace("Changes requested","Changes"):'<span class="pri">Waiting</span>'}</div>`; }).join('')||'<div class="v empty" style="color:var(--ink-3);font-style:italic">No approvers chosen.</div>'}</div>`;
+  h+=`<div class="vbox"><h3>Approvers</h3>${ds.map(x=>{ const m=memberOf(x.email), n=(m&&m.name)||(x.d&&x.d.name)||x.email; return `<div class="vdec"><span class="av" title="${esc(x.email)}" style="--sz:24px">${esc(initials(n))}</span><div><b>${esc(n)}</b>${x.d&&x.d.comment?`<div style="white-space:pre-wrap;color:var(--ink-2);margin-top:2px">${esc(x.d.comment)}</div>`:''}${x.d?`<div style="font-size:11px;color:var(--ink-3)">${new Date(x.d.at).toLocaleString()}</div>`:''}</div>${x.d?stPill(x.d.decision==="approved"?"approved":"changes").replace("Changes requested","Rejected"):'<span class="pri">Waiting</span>'}</div>`; }).join('')||'<div class="v empty" style="color:var(--ink-3);font-style:italic">No approvers chosen.</div>'}</div>`;
   if(manage&&st!=="published"&&st!=="cancelled"){
     if(st==="draft") h+=`<div class="vbox"><h3>Before you send it</h3>${VID_CHECK.map(([k,l])=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;cursor:pointer"><input type="checkbox" data-vid-check="${k}" ${(v.checklist||{})[k]?'checked':''} style="margin-top:2px">${esc(l)}</label>`).join('')}
       <div class="menu" style="margin:10px 0 0"><button class="chip primary" data-vid-send="1" ${checks&&ds.length?'':'disabled'}>Send for review</button><button class="chip" data-vid-edit="1">Edit</button></div>${!ds.length?'<div style="font-size:12px;color:var(--accent);margin-top:6px">Choose at least one approver (Edit).</div>':!checks?'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">Tick every item to enable “Send for review”.</div>':''}</div>`;
     else h+=`<div class="vbox"><h3>${st==="approved"?'Publish':'Share with the approvers'}</h3>
       ${st==="approved"?`<div style="font-size:12.5px;margin-bottom:8px">1. Open YouTube Studio and switch the video from Unlisted to <b>Public</b> (or schedule it). 2. Come back and mark it as published.</div><div class="menu"><a class="chip" href="https://studio.youtube.com/video/${esc(c.videoId)}/edit" target="_blank" rel="noopener">Open in YouTube Studio</a><button class="chip primary" data-vid-publish="1">Mark as published</button></div>`:''}
-      <div class="menu" style="margin:0"><a class="chip" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp</a><a class="chip" href="mailto:${esc((pending.length?pending:v.approvers||[]).join(","))}?subject=${encodeURIComponent("Please review: "+v.title)}&body=${encodeURIComponent(msg)}">Email${pending.length?' the '+pending.length+' waiting':''}</a><button class="chip" data-vid-copy="1">Copy message</button></div>
+      <div class="menu" style="margin:0"><a class="chip" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp</a><a class="chip" href="mailto:${esc((pending.length?pending:v.approvers||[]).join(","))}?subject=${encodeURIComponent("Please review: "+v.title)}&body=${encodeURIComponent(msg)}">Email${pending.length?' the '+pending.length+' waiting':''}</a><button class="chip" data-vid-copy="1">Copy message</button><button class="chip" data-vid-copylink="1">Copy link</button></div>
+      <div style="font-size:12px;color:var(--ink-3);margin-top:8px">The link opens a separate page. Approvers sign in with Google there, see only this video and approve or reject with a comment. They have no access to this board.</div>
       <div class="menu" style="margin:10px 0 0"><button class="chip" data-vid-version="1">Add new version</button><button class="chip" data-vid-edit="1">Edit</button>${isAdmin()&&st!=="approved"?'<button class="chip" data-vid-override="1">Override…</button>':''}</div></div>`;
   }
   const canDel=manage&&(isAdmin()||st!=="published"), active=st!=="published"&&st!=="cancelled";   // published requests are the audit record: only an admin may delete them
   if(manage&&(active||canDel)) h+=`<div class="vbox"><div class="menu" style="margin:0">${vidDelArm?`<button class="chip" data-vid-del="1" style="border-color:#c0392b;background:#c0392b;color:#fff">Yes, delete permanently</button><button class="chip" data-vid-cancelno="1">Keep it</button>`:vidArm?`<button class="chip" data-vid-cancel="1" style="border-color:#c0392b;background:#c0392b;color:#fff">Yes, cancel this request</button><button class="chip" data-vid-cancelno="1">Keep it</button>`:`${active?'<button class="chip" data-vid-cancelarm="1" style="color:#c0392b">Cancel request</button>':''}${canDel?'<button class="chip" data-vid-delarm="1" style="color:#c0392b">Delete request</button>':''}`}</div>${vidDelArm?'<div style="font-size:12px;color:var(--ink-3);margin-top:8px">This removes the request with all decisions, comments and history. The video on YouTube is not touched. To keep the record, use “Cancel request” instead.</div>':''}</div>`;
   if(st!=="draft") h+=`<div class="vbox"><h3>Pre-publish checklist</h3>${VID_CHECK.map(([k,l])=>`<div class="vhist">${(v.checklist||{})[k]?'✓':'–'} ${esc(l)}</div>`).join('')}</div>`;
-  h+=`<div class="vbox"><h3>History</h3>${Object.values(v.history||{}).sort((a,b)=>(b.at||0)-(a.at||0)).map(x=>`<div class="vhist"><span class="mono">${new Date(x.at||0).toLocaleString()}</span> · <b>${esc(x.by)}</b> ${esc(x.action)}${x.detail?' — '+esc(x.detail):''}</div>`).join('')}</div>`;
+  h+=`<div class="vbox"><h3>History</h3>${[...Object.values(v.history||{}),...Object.values(mirrorOf(v).dlog||{}).map(d=>({at:d.at,by:d.name||d.email,action:d.decision==="approved"?"approved":"rejected / requested changes",detail:"version "+d.version+(d.comment?" · "+d.comment:"")}))].sort((a,b)=>(b.at||0)-(a.at||0)).map(x=>`<div class="vhist"><span class="mono">${new Date(x.at||0).toLocaleString()}</span> · <b>${esc(x.by)}</b> ${esc(x.action)}${x.detail?' — '+esc(x.detail):''}</div>`).join('')}</div>`;
   return h; }
-function vidForm(v){ const c=v?vidCur(v):{}, upl=(v&&v.createdBy&&v.createdBy.email)||myEmail(), allAppr=((team&&team.approvers)||[]).map(x=>x.toLowerCase()), selfOut=!selfOk()&&allAppr.includes(upl), appr=allAppr.filter(e=>selfOk()||e!==upl), sel=v?(v.approvers||[]).filter(e=>selfOk()||e!==upl):appr, live=v&&v.status!=="draft";
+function vidForm(v){ const c=v?vidCur(v):{}, sel=v?(v.approvers||[]):((team&&team.approvers)||[]), live=v&&v.status!=="draft";
   openModal(`<h3>${v?'Edit approval request':'New approval request'}</h3><p class="hint">${live?'Changing the title, description or link creates a <b>new version</b> and approvals start again.':'Upload the video to YouTube as <b>Unlisted</b>, then paste the link.'}</p><form data-vid-form="${esc(v?v.id:'')}">
     ${fld("YouTube link (unlisted)",`<input name="url" required value="${esc(c.url||'')}" placeholder="https://youtu.be/…">`)}
     ${fld("Video title (as it will appear on YouTube)",`<input name="title" required maxlength="100" value="${esc(v?v.title:'')}">`)}
     ${fld("Description (as it will appear on YouTube)",`<textarea name="description" rows="4">${esc(v?v.description:'')}</textarea>`)}
     <div class="row">${fld("Planned publish date and time",`<input type="datetime-local" name="publishAt" value="${esc(v?v.publishAt:'')}">`)}${fld("Board story (optional)",`<input name="storyKey" value="${esc(v?v.storyKey:'')}" placeholder="e.g. AB-34">`)}</div>
-    <div class="fld"><span>Approvers</span>${appr.length||sel.length?[...new Set([...appr,...sel])].map(e=>{ const m=memberOf(e); return `<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink);padding:2px 0"><input type="checkbox" name="approver" value="${esc(e)}" ${sel.includes(e)?'checked':''} style="width:auto">${esc((m&&m.name)||e)} <span style="color:var(--ink-3)">${esc(e)}</span></label>`; }).join(''):`<div style="font-size:13px;color:var(--accent)">${selfOut?'The only approver is the uploader, and an uploader cannot approve their own video.':'No approvers yet.'} Open “Team &amp; access” and press “Make approver” next to a director${selfOut?', or switch on “Uploader may approve own video” there':''}.</div>`}${selfOut&&(appr.length||sel.length)?`<div style="font-size:12px;color:var(--ink-3);margin-top:4px">${esc((memberOf(upl)||{}).name||upl)} is not listed: the uploader cannot approve their own video (change this in “Team &amp; access”).</div>`:''}</div>
+    ${fld("Approvers — their Gmail addresses, one per line (they are NOT added to this board)",`<textarea name="approvers" rows="3" required placeholder="director1@gmail.com&#10;director2@gmail.com">${esc(sel.join(String.fromCharCode(10)))}</textarea>`)}
     <div class="row">${fld("Approval rule",`<select name="rule"><option value="all" ${!v||!v.rule||v.rule.type!=="count"?'selected':''}>All chosen approvers must approve</option><option value="count" ${v&&v.rule&&v.rule.type==="count"?'selected':''}>At least N approvers</option></select>`)}${fld("N (only for “at least N”)",`<input type="number" name="count" min="1" step="1" value="${esc((v&&v.rule&&v.rule.count)||2)}">`)}</div>
     <div class="actions"><span class="hint" data-vid-err style="margin:0;color:#c0392b"></span><span style="flex:1"></span><button type="button" class="chip" data-close="1">Cancel</button><button type="submit" class="chip primary">${v?'Save':'Create draft'}</button></div></form>`); }
 const vidSimpleForm=(title,hint,attr,inner,btn)=>openModal(`<h3>${title}</h3><p class="hint">${hint}</p><form ${attr}>${inner}<div class="actions"><span class="hint" data-vid-err style="margin:0;color:#c0392b"></span><span style="flex:1"></span><button type="button" class="chip" data-close="1">Cancel</button><button type="submit" class="chip primary">${btn}</button></div></form>`);
@@ -552,8 +561,8 @@ function teamHTML(){
   const emails=(team&&team.emails)||[]; const st=stages();
   const input='style="flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"';
   return `<div class="answers"><section><div class="sh">Team members (can open this board)</div>
-    ${emails.map(e=>`<div class="ans"><div class="q" style="display:flex;gap:8px;align-items:center">${avatarHTML({email:e},22)}${esc(e)}${isAdminEmail(e)?' <span class="pri">Admin</span>':''}${isApproverEmail(e)?' <span class="pri">Approver</span>':''}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${isAdmin()&&!BOOTSTRAP.includes(e.toLowerCase())?`<button class="chip" data-admin="${esc(e)}">${isAdminEmail(e)?'Remove admin':'Make admin'}</button>`:''}${isAdmin()?`<button class="chip" data-approver="${esc(e)}">${isApproverEmail(e)?'Remove approver':'Make approver'}</button>`:''}${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
-    <div class="ans"><div class="q">Approvers</div><div><div class="v empty" style="font-size:12px">Approvers (directors) approve videos before they go public. “Make approver” does not give admin rights — an approver who is not an admin only sees the Approvals tab.</div>${isAdmin()?`<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px;cursor:pointer"><input type="checkbox" data-self-approve ${selfOk()?'checked':''}>Uploader may approve own video <span class="v empty" style="font-size:12px">(off = a video always needs someone else’s approval)</span></label>`:''}</div></div>
+    ${emails.map(e=>`<div class="ans"><div class="q" style="display:flex;gap:8px;align-items:center">${avatarHTML({email:e},22)}${esc(e)}${isAdminEmail(e)?' <span class="pri">Admin</span>':''}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${isAdmin()&&!BOOTSTRAP.includes(e.toLowerCase())?`<button class="chip" data-admin="${esc(e)}">${isAdminEmail(e)?'Remove admin':'Make admin'}</button>`:''}${e.toLowerCase()===(user.email||'').toLowerCase()?'<span class="v empty">you</span>':`<button class="chip" data-rm-email="${esc(e)}" style="color:#c0392b">Remove</button>`}</div></div>`).join('')}
+    <div class="ans"><div class="q">Video approvers</div><div class="v empty" style="font-size:12px">Approvers are not team members. You type their Gmail addresses on each approval request and send them the private link.</div></div>
     <div class="ans"><div class="q">Admins</div><div class="v empty" style="font-size:12px">Admins see the Time tab (time per task, per person and the project total) and can delete any time entry. Everyone on the team can log time.</div></div>
     <div class="ans"><div class="q">Add a teammate</div><div><form data-add-email="1" style="display:flex;gap:8px;flex-wrap:wrap"><input type="email" required placeholder="their Gmail address" ${input}><button class="chip" type="submit">Add</button></form><div class="v empty" style="font-size:12px;margin-top:6px">They sign in with Google using this exact address.</div></div></div>
   </section>
@@ -575,7 +584,6 @@ function render(){
   if(!team){ root.innerHTML=loginHTML(teamErr||"Loading team list…"); return; }
   if(!isTeam()){ root.innerHTML=loginHTML(`${user.email} is not on the team list. Ask Danika to add you under “Team & access”.`); return; }
   if((tab==='time'||tab==='invoices')&&!isAdmin()) tab='board';
-  if(approverOnly()) tab='approvals';
   if(tab==='approvals'&&vidView&&videos){ const v=videos.find(x=>x.id===vidView), pl=document.querySelector('[data-player]');   // keep the video playing: refresh only the text around it
     if(v&&pl&&pl.dataset.player===v.id+"|"+vidCur(v).videoId){ document.getElementById('vid-info').innerHTML=vidInfoHTML(v); document.getElementById('vid-panel').innerHTML=vidPanelHTML(v);
       const tmp=document.createElement('div'); tmp.innerHTML=header(); root.querySelector('nav.tabs').replaceWith(tmp.querySelector('nav.tabs')); if(document.activeElement.id!=='who') root.querySelector('header.top').replaceWith(tmp.querySelector('header.top'));
@@ -764,10 +772,9 @@ document.addEventListener('click',e=>{
   if(b=t.closest('[data-vid-open]')){ openVid(b.dataset.vidOpen); return; }
   if(t.closest('[data-vid-back]')){ openVid(null); return; }
   if(t.closest('[data-vid-cancelno]')){ vidArm=false; vidDelArm=false; render(); return; }
-  if(t.closest('[data-vid-send],[data-vid-edit],[data-vid-version],[data-vid-decide],[data-vid-publish],[data-vid-override],[data-vid-copy],[data-vid-check],[data-vid-cancelarm],[data-vid-cancel],[data-vid-delarm],[data-vid-del]')){
+  if(t.closest('[data-vid-send],[data-vid-edit],[data-vid-version],[data-vid-publish],[data-vid-override],[data-vid-copy],[data-vid-copylink],[data-vid-check],[data-vid-cancelarm],[data-vid-cancel],[data-vid-delarm],[data-vid-del]')){
     const v=(videos||[]).find(x=>x.id===vidView); if(!v) return; const c=vidCur(v);
-    if(b=t.closest('[data-vid-decide]')){ if(!canDecide(v)) return; const ch=b.dataset.vidDecide==="changes", mine=myDecision(v);
-      vidSimpleForm(ch?'Request changes':'Approve this video',esc(v.title)+' · version '+esc(v.version),`data-vid-decide-form="${b.dataset.vidDecide}"`,fld(ch?"What needs to change? (you can mention the time, e.g. 02:15)":"Comment (optional)",`<textarea name="comment" rows="4" ${ch?'required':''}>${esc(mine&&mine.decision===b.dataset.vidDecide?mine.comment:'')}</textarea>`),ch?'Request changes':'Approve'); return; }
+    if(t.closest('[data-vid-copylink]')){ const l=vidLink(v); (navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>setConn("live","Link copied")).catch(()=>vidSimpleForm('Copy this link','','data-noop="1"',`<textarea rows="3" readonly style="width:100%;box-sizing:border-box">${esc(l)}</textarea>`,'Done')); return; }
     if(t.closest('[data-vid-copy]')){ const m=vidMsg(v); (navigator.clipboard?navigator.clipboard.writeText(m):Promise.reject()).then(()=>setConn("live","Message copied")).catch(()=>vidSimpleForm('Copy this message','Select the text and copy it.','data-noop="1"',`<textarea rows="5" readonly style="width:100%;box-sizing:border-box">${esc(m)}</textarea>`,'Done')); return; }
     if(!canManage(v)) return;
     if(b=t.closest('[data-vid-check]')){ vidArm=false; S().merge("board/"+v.id,{checklist:{[b.dataset.vidCheck]:b.checked}},who).catch(err=>fail(err,"Save failed")); v.checklist={...(v.checklist||{}),[b.dataset.vidCheck]:b.checked}; render(); return; }
@@ -778,7 +785,7 @@ document.addEventListener('click',e=>{
     if(t.closest('[data-vid-override]')){ if(!isAdmin()) return; vidSimpleForm('Approve by override','Use only in an emergency. Your name and the reason stay on this request permanently.','data-vid-override-form="1"',fld("Reason",`<textarea name="reason" rows="3" required></textarea>`),'Override and approve'); return; }
     if(t.closest('[data-vid-delarm]')){ vidDelArm=true; vidArm=false; render(); return; }
     if(t.closest('[data-vid-del]')){ if(!isAdmin()&&vidStatus(v)==="published") return; const keep=videos; videos=videos.filter(x=>x.id!==v.id); openVid(null); setConn("saving","Deleting…");
-      S().batch([{op:"delete",path:"board/"+v.id}],who).then(()=>setConn("live","Request deleted")).catch(err=>{ videos=keep; render(); fail(err,"Delete failed"); }); return; }
+      S().batch([{op:"delete",path:"board/"+v.id},...(v.token?[{op:"delete",path:"intake/apr-"+v.token}]:[])],who).then(()=>setConn("live","Request deleted")).catch(err=>{ videos=keep; render(); fail(err,"Delete failed"); }); return; }
     if(t.closest('[data-vid-cancelarm]')){ vidArm=true; render(); return; }
     if(t.closest('[data-vid-cancel]')){ vidArm=false; vidSave(v.id,{status:"cancelled"},"cancelled the request"); return; }
   }
@@ -791,7 +798,6 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-inv-delarm]')){ invDelArm=true; render(); return; }
   if(t.closest('[data-inv-delcancel]')){ invDelArm=false; render(); return; }
   if(b=t.closest('[data-inv-del]')){ deleteInvoice(b.dataset.invDel); return; }
-  if(b=t.closest('[data-approver]')){ if(!isAdmin()) return; const em=b.dataset.approver.toLowerCase(), cur=((team.approvers)||[]).map(x=>x.toLowerCase()); saveTeam({approvers:cur.includes(em)?cur.filter(x=>x!==em):[...cur,em]}); return; }
   if(b=t.closest('[data-admin]')){ if(!isAdmin()) return; const em=b.dataset.admin.toLowerCase(), cur=((team.admins)||[]).map(x=>x.toLowerCase()); saveTeam({admins:cur.includes(em)?cur.filter(x=>x!==em):[...cur,em]}); return; }
   if(b=t.closest('[data-move-to]')){ closeModal(); moveStory(b.dataset.story,b.dataset.moveTo,null,null); return; }
   if(b=t.closest('[data-assign-to]')){ closeModal(); const m=memberOf(b.dataset.assignTo); saveStory(b.dataset.story,{assignee:m?{email:m.email,name:m.name}:null},"Assign failed"); return; }
@@ -826,17 +832,17 @@ document.addEventListener('submit',async e=>{
   if(f.dataset.noop){ closeModal(); return; }
   if(f.dataset.vidForm!==undefined){ const err=f.querySelector('[data-vid-err]'), url=v("url"), videoId=ytId(url), id=f.dataset.vidForm, old=id&&videos.find(x=>x.id===id);
     if(!videoId){ err.textContent="That does not look like a YouTube link."; return; }
-    const approvers=fd.getAll("approver").map(x=>String(x).toLowerCase()), rule=v("rule")==="count"?{type:"count",count:Math.max(1,parseInt(v("count"),10)||1)}:{type:"all",count:0};
+    const approvers=[...new Set(String(fd.get("approvers")||"").toLowerCase().split(/[\s,;]+/).filter(Boolean))], badMail=approvers.find(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)), rule=v("rule")==="count"?{type:"count",count:Math.max(1,parseInt(v("count"),10)||1)}:{type:"all",count:0};
+    if(!approvers.length||badMail){ err.textContent=badMail?`“${badMail}” is not an email address.`:"Add at least one approver email."; return; }
+    if(JSON.stringify(approvers)!==JSON.stringify((team&&team.approvers)||[])) S().merge("config/team",{approvers},user.email).catch(()=>{});   // pre-fill next time
     const base={title:v("title"),description:String(fd.get("description")||"").trim(),publishAt:v("publishAt"),storyKey:v("storyKey").toUpperCase(),approvers,rule}, ver={url,videoId,note:"",by:myName(),at:Date.now()};
     closeModal();
-    if(!old){ const nid="vid-"+uid(); vidView=nid; await vidSave(nid,{...base,status:"draft",createdBy:{email:myEmail(),name:myName()},createdAt:Date.now(),version:1,versions:{1:ver},checklist:{},override:null},"created the request"); openVid(nid); return; }
+    if(!old){ const nid="vid-"+uid(); vidView=nid; await vidSave(nid,{...base,token:newToken(),status:"draft",createdBy:{email:myEmail(),name:myName()},createdAt:Date.now(),version:1,versions:{1:ver},checklist:{},override:null},"created the request"); openVid(nid); return; }
     if(!canManage(old)) return; const c=vidCur(old), content=old.title!==base.title||(old.description||"")!==base.description||c.videoId!==videoId;
     if(old.status==="draft"||!content) await vidSave(id,{...base,versions:{[old.version]:{...c,url,videoId}}},"edited the request");
     else await vidSave(id,{...base,version:old.version+1,versions:{[old.version+1]:{...ver,note:"Title, description or link changed"}},override:null},"changed the content","version "+(old.version+1)+" · approvals start again");
     return; }
-  if(f.dataset.vidVersionForm||f.dataset.vidDecideForm||f.dataset.vidPublishForm||f.dataset.vidOverrideForm){ const vd=(videos||[]).find(x=>x.id===vidView), err=f.querySelector('[data-vid-err]'); if(!vd) return;
-    if(f.dataset.vidDecideForm){ if(!canDecide(vd)) return; const d=f.dataset.vidDecideForm, comment=String(fd.get("comment")||"").trim(); if(d==="changes"&&!comment){ err.textContent="Please say what needs to change."; return; }
-      closeModal(); await vidSave(vd.id,{decisions:{[emailKey(myEmail())]:{version:vd.version,decision:d,comment,name:myName(),at:Date.now()}}},d==="approved"?"approved":"requested changes",("version "+vd.version)+(comment?" · "+comment:"")); return; }
+  if(f.dataset.vidVersionForm||f.dataset.vidPublishForm||f.dataset.vidOverrideForm){ const vd=(videos||[]).find(x=>x.id===vidView), err=f.querySelector('[data-vid-err]'); if(!vd) return;
     if(f.dataset.vidVersionForm){ if(!canManage(vd)) return; const url=v("url"), videoId=ytId(url); if(!videoId){ err.textContent="That does not look like a YouTube link."; return; } if(videoId===vidCur(vd).videoId){ err.textContent="This is the same video as the current version."; return; }
       closeModal(); await vidSave(vd.id,{version:vd.version+1,versions:{[vd.version+1]:{url,videoId,note:v("note"),by:myName(),at:Date.now()}},status:"review",override:null},"added a new version","version "+(vd.version+1)+(v("note")?" · "+v("note"):"")+" · approvals start again"); return; }
     if(f.dataset.vidPublishForm){ if(!canManage(vd)||vidStatus(vd)!=="approved") return; closeModal(); await vidSave(vd.id,{status:"published",published:{url:v("url"),by:myName(),at:Date.now()}},"marked it as published",v("url")); return; }
@@ -859,7 +865,6 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='who'){who=e.target.value.trim();localStorage.setItem('ab-who',who);}
   if(e.target.matches('[data-show-archived]')){ showArchived=e.target.checked; render(); }
-  if(e.target.matches('[data-self-approve]')){ if(isAdmin()) saveTeam({selfApprove:e.target.checked}); }
   if(e.target.matches('[data-time-p]')){ timeP=e.target.value; render(); }
   if(e.target.matches('[data-time-w]')){ timeWho=e.target.value; render(); }
 });
@@ -867,12 +872,12 @@ document.addEventListener('input',e=>{ const f=e.target.closest&&e.target.closes
 
 /* ---- boot: auth → team → live data ------------------------------------------------ */
 let profileSynced=false, unTeam=null, unMeta=null, unEpics=null, unStories=null, unAns=null, unBoard=null, lastAnsPath=null;
-function stopAll(){ [unMeta,unEpics,unStories,unAns,unBoard].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=unBoard=null; billing=null; invoices=null; videos=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
+function stopAll(){ [unMeta,unEpics,unStories,unAns,unBoard].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=unBoard=null; Object.values(unMirrors).forEach(u=>u()); unMirrors={}; mirrors={}; billing=null; invoices=null; videos=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
 function startData(){
   if(unMeta) return;
   const S_=S(); const onErr=err=>{ setConn("err","Connection error: "+err.code); };
   unMeta=S_.watch("board/meta",d=>{ meta=d||{}; render(); },onErr);
-  unBoard=S_.watchCollection("board",list=>{ billing=list.find(d=>d.id==="billing")||{}; invoices=list.filter(d=>d.id.startsWith("inv-")); videos=list.filter(d=>d.id.startsWith("vid-")); if(tab==='invoices'||tab==='approvals') render(); },onErr);
+  unBoard=S_.watchCollection("board",list=>{ billing=list.find(d=>d.id==="billing")||{}; invoices=list.filter(d=>d.id.startsWith("inv-")); videos=list.filter(d=>d.id.startsWith("vid-")); syncMirrors(); if(tab==='invoices'||tab==='approvals') render(); },onErr);
   unEpics=S_.watchCollection("epics",list=>{ epics=Object.fromEntries(list.map(e=>[e.id,e])); render(); },onErr);
   unStories=S_.watchCollection("stories",list=>{ stories=Object.fromEntries(list.map(s=>[s.id,s])); const last=list.map(s=>s.updatedBy).filter(Boolean).pop(); if(conn!=="saving"){ conn="live"; connMsg=last?`Live · last change by ${last}`:"Live"; } render(); },onErr);
 }

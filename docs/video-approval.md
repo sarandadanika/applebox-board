@@ -96,21 +96,29 @@ status automatically, approval of Facebook / Instagram / TikTok posts (same flow
 | 2 | Automatic email to approvers and reminder before the target date | Firebase Blaze plan + email extension |
 | 3 | "Publish now" from the board through the YouTube Data API; auto-detect that a video went public | Google Cloud project, OAuth consent, channel owner grant |
 
-## Phase 1 — as built
+## Phase 1 — as built (v2: approvers are outside the board)
 ![Approval flow](video-approval-flow.png)
 
-Defaults chosen where no decision was given (all changeable):
-- **Approvers** are team members marked *Approver* in *Team & access* (admin only). They sign in with Google.
-  An approver who is not an admin sees **only the Approvals tab**.
-- **Rule** is chosen per request: all chosen approvers (default) or at least N.
-- **Notify** with a prepared message: WhatsApp, email (to the approvers still waiting) or copy. The message
-  links to `…/#v=<request>` which opens the request straight after sign-in.
-- **Storage** is `board/vid-<id>`, so no Firestore rules change was needed. Role separation is UI-level,
-  like Time and Invoices. "Changes requested" / "Approved" are calculated from the decisions on the
-  current version, never stored, so simultaneous decisions cannot overwrite each other.
-- Editing title, description or link after sending creates a new version (approvals restart); a video
-  the uploader is also an approver of cannot be approved by them; admins can override with a reason.
-- The video keeps playing while other people's decisions arrive (only the side panel refreshes).
+- **Approvers are not team members.** The uploader types their Gmail addresses on the request. They never
+  get access to the board: Firestore rules give board data to team members only.
+- **Separate approver page** `approve/#<token>`. The WhatsApp / email message carries this private link.
+  The approver signs in with Google, sees only that one video (title, description, planned date),
+  and chooses **Approve** or **Reject / request changes** with a comment (required when rejecting).
+  They can change their decision until the video is published.
+- **How it is stored:** the request itself is `board/vid-<id>` (team only). When it is sent for review the
+  board writes a public copy `intake/apr-<token>` (32-hex random token; documents there cannot be listed,
+  same mechanism as the client checklist). The approver page writes `decisions.<email>` and `dlog.<id>`
+  into that copy; the board watches it live and shows decisions, comments and history.
+- **Rule** per request: all approvers (default) or at least N. Status (in review / rejected / approved) is
+  calculated from the decisions on the current version, so a new version restarts approval.
+- **Publish stays manual:** when the board shows *Approved — ready to publish*, the uploader switches the
+  video to Public in YouTube Studio and presses *Mark as published*. Admins can override with a reason.
+- Requests can be cancelled (kept as record) or deleted (removes the public copy too, the link stops working).
+
+**Security note:** the approver page checks that the signed-in Google account is on the request's approver
+list. That check runs in the page; the public copy itself is protected by the secret link. Someone who
+has the link *and* technical skill could write to the copy directly. To make it strict, add a rule in
+`firestore.rules` that only lets a signed-in approver write their own decision (one paste in the Firebase console).
 
 ## Decisions needed before building
 1. Who are the approvers, and is the rule *all of them* or *N of M*?

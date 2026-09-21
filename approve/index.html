@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Apple Box · Video approval</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='40' y='62' width='120' height='108' rx='10' fill='%23e6332a'/%3E%3Cpolygon points='84,88 84,144 132,116' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../shared.css">
+<style>
+body{font-size:14.5px;line-height:1.5}
+.wrap{max-width:760px;margin:0 auto}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.box h3{margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.player{position:relative;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden;margin-bottom:14px} .player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.title{font-size:19px;font-weight:800;line-height:1.3} .sub{font-size:12.5px;color:var(--ink-3);margin:4px 0 0}
+.btn{font:inherit;font-size:15px;font-weight:600;border-radius:8px;padding:12px 18px;min-height:46px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;flex:1}
+.btn.ok{background:var(--done);border-color:var(--done);color:#fff} .btn.no{border-color:var(--accent);color:var(--accent)} .btn.dark{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:96px;resize:vertical;margin:8px 0 10px}
+.flag{padding:12px 14px;border-radius:8px;font-weight:700;border:1px solid;margin-bottom:14px} .flag.ok{color:var(--done);border-color:var(--done)} .flag.no{color:var(--accent);border-color:var(--accent)} .flag.wait{color:var(--doing);border-color:var(--doing)}
+.dec{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px} .dec:last-child{border-bottom:0}
+.pill{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--ink-2);align-self:start}
+.pill.ok{border-color:var(--done);color:var(--done)} .pill.no{border-color:var(--accent);color:var(--accent)}
+.muted{color:var(--ink-3);font-size:12.5px} .err{color:#c0392b;font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<script src="../firebase-config.js"></script>
+<script type="module" src="../store.js"></script>
+<script>
+/* Approver page. Opened from the private link …/approve/#<token>. The approver signs in with Google,
+   sees ONE request (the public copy intake/apr-<token>) and approves or rejects it with a comment.
+   Nothing here can read the board: Firestore rules only give board data to team members. */
+const logo='<svg width="36" height="36" viewBox="0 0 200 200" aria-hidden="true"><polygon points="40,62 100,34 100,70 40,98" fill="#b8241c"/><polygon points="160,62 100,34 100,70 160,98" fill="#ff5a4a"/><rect x="40" y="62" width="120" height="108" rx="10" fill="#e6332a"/><polygon points="84,88 84,144 132,116" fill="#fff"/></svg>';
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const emailKey=e=>String(e||"").toLowerCase().replace(/\./g,",");
+const mask=e=>{ const [a,b]=String(e).split("@"); return (a||"").slice(0,2)+"•••@"+(b||""); };
+const token=(location.hash||"").replace(/[^a-f0-9]/g,"");
+const S=()=>window.AppleBoxStore;
+let user=undefined, req=undefined, mode=null, draft="", busy=false, errMsg="", authErr="", un=null, shownVideo="";
+
+const me=()=>((user&&user.email)||"").toLowerCase();
+const decisions=()=>(req.approvers||[]).map(e=>{ const d=(req.decisions||{})[emailKey(e)]; return {email:e,d:d&&d.version===req.version?d:null}; });
+const needed=()=>{ const n=(req.approvers||[]).length; return req.rule&&req.rule.type==="count"?Math.max(1,Math.min(+req.rule.count||1,n)):n; };
+function status(){ if(req.status==="published"||req.status==="cancelled") return req.status; if(req.overridden) return "approved";
+  const ds=decisions(); if(ds.some(x=>x.d&&x.d.decision==="changes")) return "changes"; return ds.filter(x=>x.d&&x.d.decision==="approved").length>=needed()?"approved":"review"; }
+const mine=()=>{ const d=(req.decisions||{})[emailKey(me())]; return d&&d.version===req.version?d:null; };
+const canDecide=()=>req.status==="review"&&!req.overridden&&(req.approvers||[]).includes(me());
+
+const head=`<header class="top" style="margin-bottom:16px"><div class="brand">${logo}<div><h1>Apple Box — video approval</h1><p class="sub">Please review this video before it goes public</p></div></div></header>`;
+function shell(inner){ document.getElementById('root').innerHTML=head+inner; shownVideo=""; }
+function render(){
+  if(!token) return shell(`<div class="box">This link is incomplete. Please open the full link from the message you received.</div>`);
+  if(user===undefined) return shell(`<div class="box muted">Checking sign-in…</div>`);
+  if(!user) return shell(`<div class="box"><div class="title" style="font-size:17px">Sign in to review the video</div><p class="muted" style="margin:6px 0 14px">Use the Google (Gmail) account that the Apple Box team has for you. It only confirms who is approving — nothing is posted anywhere.</p>
+    <div class="row"><button class="btn dark" data-signin="1">Sign in with Google</button></div>${authErr?`<div class="err">${esc(authErr)}<br>If the sign-in window does not open, open this link in Chrome or Safari instead of inside WhatsApp.</div>`:''}</div>`);
+  if(req===undefined) return shell(`<div class="box muted">Loading…</div>`);
+  if(!req||req.kind!=="approval") return shell(`<div class="box">This approval link is no longer valid. The request may have been removed — please ask the Apple Box team for a new link.</div>${account()}`);
+  if(!(req.approvers||[]).includes(me())) return shell(`<div class="box"><div class="title" style="font-size:17px">This review is not shared with ${esc(user.email)}</div><p class="muted" style="margin:6px 0 0">It was sent to: ${(req.approvers||[]).map(mask).map(esc).join(", ")}. Sign in with that Google account, or ask the Apple Box team to add this address.</p></div>${account()}`);
+  if(shownVideo!==req.videoId+"|"+req.version){                      // build the player once, then only refresh the text under it
+    document.getElementById('root').innerHTML=head+`<div class="player"><iframe src="https://www.youtube-nocookie.com/embed/${esc(req.videoId)}?rel=0" title="Video" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div id="body"></div>`;
+    shownVideo=req.videoId+"|"+req.version; }
+  document.getElementById('body').innerHTML=bodyHTML();
+}
+const account=()=>`<div class="muted" style="text-align:center;margin:18px 0">Signed in as ${esc(user.email)} · <a href="#" data-signout="1">use another account</a></div>`;
+function bodyHTML(){ const st=status(), m=mine(), ds=decisions(), ok=ds.filter(x=>x.d&&x.d.decision==="approved").length;
+  let h=`<div class="box"><div class="title">${esc(req.title)}</div><p class="sub">Version ${esc(req.version)}${req.uploader?' · uploaded by '+esc(req.uploader):''}${req.publishAt?' · planned publish '+esc(String(req.publishAt).replace("T"," ")):''} · <a href="${esc(req.url)}" target="_blank" rel="noopener">open on YouTube</a></p>
+    ${req.note?`<p class="sub">What changed in this version: ${esc(req.note)}</p>`:''}
+    <h3 style="margin-top:14px">Description that will go live</h3><div style="white-space:pre-wrap">${esc(req.description||'—')}</div></div>`;
+  if(req.status==="published") h+=`<div class="flag ok">This video has been published. Thank you.</div>`;
+  else if(req.status==="cancelled") h+=`<div class="flag no">This request was cancelled. No decision is needed.</div>`;
+  else if(canDecide()){
+    if(mode) h+=`<div class="box"><h3>${mode==="approved"?'Approve this video':'Reject — what needs to change?'}</h3>
+        <textarea id="comment" placeholder="${mode==="approved"?'Comment (optional)':'Please describe what to fix. You can mention the time, e.g. 02:15 logo is cut off'}">${esc(draft)}</textarea>
+        <div class="row"><button class="btn" data-back="1" ${busy?'disabled':''}>Back</button><button class="btn ${mode==="approved"?'ok':'no'}" data-confirm="1" ${busy?'disabled':''}>${busy?'Saving…':mode==="approved"?'Confirm approval':'Send rejection'}</button></div>${errMsg?`<div class="err">${esc(errMsg)}</div>`:''}</div>`;
+    else h+=`${m?`<div class="flag ${m.decision==="approved"?'ok':'no'}">You ${m.decision==="approved"?'approved':'rejected'} this video${m.comment?': “'+esc(m.comment)+'”':''}. You can change your decision until it is published.</div>`:`<div class="flag wait">Your decision is needed</div>`}
+      <div class="box"><h3>Your decision</h3><p class="muted" style="margin:0 0 12px">Watch the video above, then choose. You can add a comment in the next step.</p><div class="row"><button class="btn ok" data-mode="approved">Approve</button><button class="btn no" data-mode="changes">Reject / request changes</button></div></div>`;
+  }
+  h+=`<div class="box"><h3>Approvers · ${ok} of ${needed()} needed approvals</h3>${ds.map(x=>`<div class="dec"><div><b>${esc((x.d&&x.d.name)||(x.email===me()?user.displayName||x.email:mask(x.email)))}</b>${x.email===me()?' <span class="muted">(you)</span>':''}${x.d&&x.d.comment?`<div style="white-space:pre-wrap;color:var(--ink-2)">${esc(x.d.comment)}</div>`:''}${x.d?`<div class="muted" style="font-size:11.5px">${new Date(x.d.at).toLocaleString()}</div>`:''}</div><span class="pill ${x.d?(x.d.decision==="approved"?'ok':'no'):''}">${x.d?(x.d.decision==="approved"?'Approved':'Rejected'):'Waiting'}</span></div>`).join('')}
+    <p class="muted" style="margin:10px 0 0">${st==="approved"?'Approved — the team can now publish it.':st==="changes"?'Rejected — the team will upload a corrected version and ask again.':'The team publishes only after approval.'}</p></div>`;
+  return h+account(); }
+
+document.addEventListener('click',async e=>{ const t=e.target; let b;
+  if(t.closest('[data-signin]')){ authErr=""; S().signIn().catch(err=>{ authErr="Sign-in failed: "+(err.code||err.message); render(); }); return; }
+  if(t.closest('[data-signout]')){ e.preventDefault(); S().signOut(); return; }
+  if(b=t.closest('[data-mode]')){ mode=b.dataset.mode; const m=mine(); draft=m&&m.decision===mode?(m.comment||""):""; errMsg=""; render(); const c=document.getElementById('comment'); if(c) c.focus(); return; }
+  if(t.closest('[data-back]')){ mode=null; errMsg=""; render(); return; }
+  if(t.closest('[data-confirm]')){ const comment=draft.trim(); if(!canDecide()) return;
+    if(mode==="changes"&&!comment){ errMsg="Please say what needs to change."; render(); return; }
+    const entry={version:req.version,decision:mode,comment:comment.slice(0,2000),name:user.displayName||user.email,email:me(),at:Date.now()};
+    busy=true; errMsg=""; render();
+    try{ await S().merge("intake/apr-"+token,{decisions:{[emailKey(me())]:entry},dlog:{["d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)]:entry}},entry.name);
+      req.decisions={...(req.decisions||{}),[emailKey(me())]:entry}; mode=null; draft=""; }
+    catch(err){ errMsg="Could not save: "+(err.code||err.message); }
+    busy=false; render(); window.scrollTo({top:document.getElementById('body').offsetTop-10,behavior:"smooth"}); }
+});
+document.addEventListener('input',e=>{ if(e.target.id==='comment') draft=e.target.value; });
+
+document.addEventListener('applebox-store-ready',()=>{
+  if(!S().configured){ user=null; authErr="Not connected — please try again later."; render(); return; }
+  S().onAuth(u=>{ user=u||null; if(un){ un(); un=null; } req=undefined; mode=null; render(); if(!user||!token) return;
+    un=S().watch("intake/apr-"+token,d=>{ req=d; if(!mode) render(); },err=>{ req=null; render(); }); });
+});
+render();
+</script>
+</body>
+</html>

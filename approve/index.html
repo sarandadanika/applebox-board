@@ -58,8 +58,8 @@ const ST={review:["Waiting for approval",""],changes:["Rejected · changes reque
 const when=t=>t?new Date(t).toLocaleString():"";
 const canDecide=()=>req.status==="review"&&!req.overridden&&(req.approvers||[]).includes(me());
 
-const head=`<header class="top" style="margin-bottom:16px"><div class="brand">${logo}<div><h1>Apple Box — video approval</h1><p class="sub">Please review this video before it goes public</p></div></div></header>`;
-function shell(inner){ document.getElementById('root').innerHTML=head+inner; shownVideo=""; }
+const head=()=>`<header class="top" style="margin-bottom:16px;align-items:center"><div class="brand">${logo}<div><h1>Apple Box — video approval</h1><p class="sub">${token?'Please review this video before it goes public':'Your videos to review'}</p></div></div>${user&&token?'<button class="btn dark" data-hist="1" style="flex:0 0 auto;min-height:40px;padding:9px 16px;font-size:14px">My approvals</button>':''}</header>`;
+function shell(inner){ document.getElementById('root').innerHTML=head()+inner; shownVideo=""; }
 function render(){
   if(user===undefined) return shell(`<div class="box muted">Checking sign-in…</div>`);
   if(!user) return shell(`<div class="box"><div class="title" style="font-size:17px">Sign in to review the video</div><p class="muted" style="margin:6px 0 14px">Use the Google (Gmail) account that the Apple Box team has for you. It only confirms who is approving — nothing is posted anywhere.</p>
@@ -69,7 +69,7 @@ function render(){
   if(!req||req.kind!=="approval") return shell(`<div class="box">This approval link is no longer valid. The request may have been removed — please ask the Apple Box team for a new link.</div>${account()}`);
   if(!(req.approvers||[]).includes(me())) return shell(`<div class="box"><div class="title" style="font-size:17px">This review is not shared with ${esc(user.email)}</div><p class="muted" style="margin:6px 0 0">It was sent to: ${(req.approvers||[]).map(mask).map(esc).join(", ")}. Sign in with that Google account, or ask the Apple Box team to add this address.</p></div>${account()}`);
   if(shownVideo!==req.videoId+"|"+req.version){                      // build the player once, then only refresh the text under it
-    document.getElementById('root').innerHTML=head+`<div class="player"><iframe src="https://www.youtube-nocookie.com/embed/${esc(req.videoId)}?rel=0" title="Video" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div id="body"></div>`;
+    document.getElementById('root').innerHTML=head()+`<div class="player"><iframe src="https://www.youtube-nocookie.com/embed/${esc(req.videoId)}?rel=0" title="Video" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div id="body"></div>`;
     shownVideo=req.videoId+"|"+req.version; }
   document.getElementById('body').innerHTML=bodyHTML();
 }

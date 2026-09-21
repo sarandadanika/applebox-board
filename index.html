@@ -468,12 +468,23 @@ const mirrorOf=v=>(v.token&&mirrors[v.token])||{};
 const allDecisions=v=>({...(v.decisions||{}),...(mirrorOf(v).decisions||{})});
 const vidMirror=v=>{ const c=vidCur(v); return {kind:"approval",title:v.title||"",description:v.description||"",publishAt:v.publishAt||"",version:v.version,url:c.url||"",videoId:c.videoId||"",note:c.note||"",
   approvers:v.approvers||[],rule:v.rule||{type:"all"},status:v.status,overridden:!!v.override,uploader:(v.createdBy&&v.createdBy.name)||""}; };
+/* Approver inbox: an approver's page registers a random inboxKey on any request it opens (mirror.reg.<emailKey>).
+   The board remembers the FIRST key per email in board/approvers.keys and lists every request sent to that
+   approver in intake/apx-<inboxKey>, so pending requests show up on their "My approvals" page unopened. */
+let apprKeys=null;
+const inboxItem=v=>({title:v.title||"",videoId:vidCur(v).videoId||"",version:v.version,status:v.status,at:Date.now()});
+function syncInbox(v,removed){ if(!apprKeys||!v.token||v.status==="draft") return;
+  (v.approvers||[]).forEach(e=>{ const key=apprKeys[emailKey(e)]; if(key) S().merge("intake/apx-"+key,{kind:"approver-inbox",items:{[v.token]:removed?{...inboxItem(v),removed:true}:inboxItem(v)}},who).catch(err=>console.error(err)); }); }
+function learnInboxKeys(m){ if(!apprKeys||!m||!m.reg) return;
+  Object.entries(m.reg).forEach(([k,r])=>{ const key=r&&r.inboxKey; if(!/^[a-f0-9]{32}$/.test(key||"")||apprKeys[k]) return;          // first registration wins
+    apprKeys[k]=key; S().merge("board/approvers",{keys:{[k]:key}},who).catch(err=>console.error(err));
+    (videos||[]).filter(v=>(v.approvers||[]).some(e=>emailKey(e)===k)).forEach(v=>syncInbox(v)); }); }
 function syncMirrors(){
   (videos||[]).filter(v=>!v.token&&v.status!=="draft"&&canManage(v)).forEach(v=>{ v.token=newToken();      // requests sent before the approver page existed
     S().merge("board/"+v.id,{token:v.token},who).then(()=>S().merge("intake/apr-"+v.token,vidMirror(v),who)).catch(e=>console.error(e)); });
   const want=new Set((videos||[]).filter(v=>v.token).map(v=>v.token));
   Object.keys(unMirrors).forEach(t=>{ if(!want.has(t)){ unMirrors[t](); delete unMirrors[t]; delete mirrors[t]; } });
-  want.forEach(t=>{ if(!unMirrors[t]) unMirrors[t]=S().watch("intake/apr-"+t,d=>{ mirrors[t]=d||{}; if(tab==='approvals') render(); },err=>console.error(err)); }); }
+  want.forEach(t=>{ if(!unMirrors[t]) unMirrors[t]=S().watch("intake/apr-"+t,d=>{ mirrors[t]=d||{}; learnInboxKeys(d); if(tab==='approvals') render(); },err=>console.error(err)); }); }
 const ytId=u=>{ const m=String(u||"").match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})/); return m?m[1]:""; };
 const vidCur=v=>(v.versions||{})[v.version]||{};
 const vidDecisions=v=>(v.approvers||[]).map(e=>{ const d=allDecisions(v)[emailKey(e)]; return {email:e,d:d&&d.version===v.version?d:null}; });
@@ -484,7 +495,9 @@ function vidStatus(v){ if(v.status==="draft"||v.status==="published"||v.status==
 const canManage=v=>isAdmin()||(v.createdBy&&v.createdBy.email===myEmail());
 const vidLink=v=>location.origin+location.pathname.replace(/[^/]*$/,"")+"approve/#"+(v.token||"");
 const vidWhen=s=>s?String(s).replace("T"," "):"";
-const vidMsg=v=>`Please review “${v.title}” for the Apple Box YouTube channel${v.publishAt?` (planned publish: ${vidWhen(v.publishAt)})`:''}. Open this link, sign in with your Google (Gmail) account, watch the video and approve or reject it with a comment: ${vidLink(v)}`;
+const vidMsg=v=>`Please review “${v.title}” for the Apple Box YouTube channel${v.publishAt?` (planned publish: ${vidWhen(v.publishAt)})`:''}. Open this link, sign in with your Google (Gmail) account, watch the video and approve or reject it with a comment: ${vidLink(v)}
+
+All your pending and approved videos: ${vidLink({token:""}).replace(/#$/,"")}`;
 const stPill=st=>`<span class="pri st ${st}">${VID_LABEL[st]||st}</span>`;
 function deepMerge(t,p){ Object.entries(p).forEach(([k,x])=>{ if(x&&typeof x==="object"&&!Array.isArray(x)&&t[k]&&typeof t[k]==="object"&&!Array.isArray(t[k])) deepMerge(t[k],x); else t[k]=x; }); return t; }
 async function vidSave(id,patch,action,detail){                       // optimistic; every change also writes one history entry
@@ -492,7 +505,7 @@ async function vidSave(id,patch,action,detail){                       // optimis
   const v=(videos||[]).find(x=>x.id===id); if(v) deepMerge(v,JSON.parse(JSON.stringify(full))); else videos.push({id,...JSON.parse(JSON.stringify(full))});
   const cur=videos.find(x=>x.id===id); if(!cur.token){ cur.token=full.token=newToken(); }        // requests made before the approver page existed
   render(); setConn("saving","Saving…");
-  try{ await S().merge("board/"+id,full,who); if(cur.status!=="draft") await S().merge("intake/apr-"+cur.token,vidMirror(cur),who); syncMirrors(); setConn("live","Saved · live"); }catch(e){ fail(e,"Save failed"); } }
+  try{ await S().merge("board/"+id,full,who); if(cur.status!=="draft") await S().merge("intake/apr-"+cur.token,vidMirror(cur),who); syncInbox(cur); syncMirrors(); setConn("live","Saved · live"); }catch(e){ fail(e,"Save failed"); } }
 function openVid(id){ vidView=id; vidArm=false; vidDelArm=false; try{ history.replaceState(null,"",id?"#v="+id:location.pathname+location.search); }catch(e){} render(); window.scrollTo(0,0); }
 
 function approvalsHTML(){
@@ -795,7 +808,7 @@ document.addEventListener('click',e=>{
     if(t.closest('[data-vid-publish]')){ if(vidStatus(v)!=="approved") return; vidSimpleForm('Mark as published','Do this after you switched the video to Public in YouTube Studio.','data-vid-publish-form="1"',fld("Public link",`<input name="url" required value="https://youtu.be/${esc(c.videoId)}">`),'Mark as published'); return; }
     if(t.closest('[data-vid-override]')){ if(!isAdmin()) return; vidSimpleForm('Approve by override','Use only in an emergency. Your name and the reason stay on this request permanently.','data-vid-override-form="1"',fld("Reason",`<textarea name="reason" rows="3" required></textarea>`),'Override and approve'); return; }
     if(t.closest('[data-vid-delarm]')){ vidDelArm=true; vidArm=false; render(); return; }
-    if(t.closest('[data-vid-del]')){ if(!isAdmin()&&vidStatus(v)==="published") return; const keep=videos; videos=videos.filter(x=>x.id!==v.id); openVid(null); setConn("saving","Deleting…");
+    if(t.closest('[data-vid-del]')){ if(!isAdmin()&&vidStatus(v)==="published") return; const keep=videos; syncInbox(v,true); videos=videos.filter(x=>x.id!==v.id); openVid(null); setConn("saving","Deleting…");
       S().batch([{op:"delete",path:"board/"+v.id},...(v.token?[{op:"delete",path:"intake/apr-"+v.token}]:[])],who).then(()=>setConn("live","Request deleted")).catch(err=>{ videos=keep; render(); fail(err,"Delete failed"); }); return; }
     if(t.closest('[data-vid-cancelarm]')){ vidArm=true; render(); return; }
     if(t.closest('[data-vid-cancel]')){ vidArm=false; vidSave(v.id,{status:"cancelled"},"cancelled the request"); return; }
@@ -884,12 +897,12 @@ document.addEventListener('input',e=>{ const f=e.target.closest&&e.target.closes
 
 /* ---- boot: auth → team → live data ------------------------------------------------ */
 let profileSynced=false, unTeam=null, unMeta=null, unEpics=null, unStories=null, unAns=null, unBoard=null, lastAnsPath=null;
-function stopAll(){ [unMeta,unEpics,unStories,unAns,unBoard].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=unBoard=null; Object.values(unMirrors).forEach(u=>u()); unMirrors={}; mirrors={}; billing=null; invoices=null; videos=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
+function stopAll(){ [unMeta,unEpics,unStories,unAns,unBoard].forEach(u=>u&&u()); unMeta=unEpics=unStories=unAns=unBoard=null; Object.values(unMirrors).forEach(u=>u()); unMirrors={}; mirrors={}; apprKeys=null; billing=null; invoices=null; videos=null; meta=null; epics=null; stories=null; answers=null; lastAnsPath=null; }
 function startData(){
   if(unMeta) return;
   const S_=S(); const onErr=err=>{ setConn("err","Connection error: "+err.code); };
   unMeta=S_.watch("board/meta",d=>{ meta=d||{}; render(); },onErr);
-  unBoard=S_.watchCollection("board",list=>{ billing=list.find(d=>d.id==="billing")||{}; invoices=list.filter(d=>d.id.startsWith("inv-")); videos=list.filter(d=>d.id.startsWith("vid-")); syncMirrors(); if(tab==='invoices'||tab==='approvals') render(); },onErr);
+  unBoard=S_.watchCollection("board",list=>{ billing=list.find(d=>d.id==="billing")||{}; invoices=list.filter(d=>d.id.startsWith("inv-")); apprKeys={...((list.find(d=>d.id==="approvers")||{}).keys||{})}; videos=list.filter(d=>d.id.startsWith("vid-")); syncMirrors(); if(tab==='invoices'||tab==='approvals') render(); },onErr);
   unEpics=S_.watchCollection("epics",list=>{ epics=Object.fromEntries(list.map(e=>[e.id,e])); render(); },onErr);
   unStories=S_.watchCollection("stories",list=>{ stories=Object.fromEntries(list.map(s=>[s.id,s])); const last=list.map(s=>s.updatedBy).filter(Boolean).pop(); if(conn!=="saving"){ conn="live"; connMsg=last?`Live · last change by ${last}`:"Live"; } render(); },onErr);
 }

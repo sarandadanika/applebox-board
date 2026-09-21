@@ -44,7 +44,7 @@ let user=undefined, req=undefined, mode=null, draft="", busy=false, errMsg="", a
 /* "My approval history": every approver keeps their own list at intake/aph-<their Firebase uid>. The uid is
    only known to the signed-in person and these documents cannot be listed, so nobody else can find it.
    items.<token> = { title, videoId, version, firstAt, lastAt, log:{ id:{version,decision,comment,at} } } */
-let hist=undefined, unHist=null, liveReq={}, seenSaved="";
+let hist=undefined, unHist=null, liveReq={}, seenSaved="", inbox=null, unInbox=null, regSaved="";
 let editing=false, eTitle="", eDesc="";
 const histPath=()=>"intake/aph-"+user.uid;
 
@@ -73,28 +73,49 @@ function render(){
     shownVideo=req.videoId+"|"+req.version; }
   document.getElementById('body').innerHTML=bodyHTML();
 }
-const account=()=>`<div class="muted" style="text-align:center;margin:18px 0">${token?'<a href="#" data-hist="1">My approval history</a> · ':''}Signed in as ${esc(user.email)} · <a href="#" data-signout="1">use another account</a></div>`;
+const account=()=>`<div class="muted" style="text-align:center;margin:18px 0">${token?'<a href="#" data-hist="1">My approvals (pending, approved, history)</a> · ':''}Signed in as ${esc(user.email)} · <a href="#" data-signout="1">use another account</a></div>`;
 const decRow=d=>`<div class="dec"><div>Version ${esc(d.version)}${d.comment?`<div style="white-space:pre-wrap;color:var(--ink-2)">${esc(d.comment)}</div>`:''}<div class="muted" style="font-size:11.5px">${esc(when(d.at))}</div></div><span class="pill ${d.decision==="approved"?'ok':'no'}">${d.decision==="approved"?'You approved':'You rejected'}</span></div>`;
 function histHTML(){
-  if(hist===undefined) return `<div class="box muted">Loading your history…</div>`;
-  const items=Object.entries(hist.items||{}).sort((a,b)=>(b[1].lastAt||0)-(a[1].lastAt||0));
-  let h=`<div class="box"><div class="title" style="font-size:17px">My approval history</div><p class="sub">Every video you were asked to review with this Google account, newest first.</p></div>`;
-  if(!items.length) h+=`<div class="box muted">Nothing here yet. Videos appear after you open an approval link from the Apple Box team.</div>`;
-  items.forEach(([t,it])=>{ const live=liveReq[t], m=live&&mine(live), log=Object.values(it.log||{}).sort((a,b)=>(b.at||0)-(a.at||0)), st=live?ST[status(live)]:null;
-    const todo=live&&live.status==="review"&&!live.overridden&&!m&&(live.approvers||[]).includes(me());
-    h+=`<div class="box"><div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start"><img src="https://i.ytimg.com/vi/${esc((live&&live.videoId)||it.videoId)}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:112px;height:63px;object-fit:cover;border-radius:6px;background:var(--surface-2)">
-      <div><b>${esc((live&&live.title)||it.title)}</b> <span class="muted">v${esc((live&&live.version)||it.version)}</span>
-        <div style="margin:4px 0">${live===undefined?'<span class="pill">Checking…</span>':live===null?'<span class="pill">Request removed</span>':`<span class="pill ${st[1]}">${st[0]}</span>`}${todo?' <span class="pill no">Your decision is needed</span>':''}</div>
-        <div class="muted">First opened ${esc(when(it.firstAt))}</div></div></div>
-      ${log.length?`<div style="margin-top:10px">${log.map(decRow).join('')}</div>`:'<div class="muted" style="margin-top:8px">You have not decided on this video.</div>'}
-      ${live?`<div class="row" style="margin-top:10px"><button class="btn" data-open="${esc(t)}" style="flex:0 0 auto;min-height:38px;padding:8px 14px;font-size:13.5px">${todo?'Review now':'Open'}</button></div>`:''}</div>`; });
+  if(hist===undefined) return `<div class="box muted">Loading your approvals…</div>`;
+  const ibx=(inbox&&inbox.items)||{}, own=hist.items||{};
+  const rows=[...new Set([...Object.keys(ibx),...Object.keys(own)])].map(t=>{ const it=own[t]||{}, ib=ibx[t]||{}, live=liveReq[t], m=live&&mine(live);
+    const st=live?status(live):(live===null||ib.removed)?"removed":"checking";
+    const todo=!!live&&live.status==="review"&&!live.overridden&&!m&&(st==="review"||st==="changes")&&(live.approvers||[]).includes(me());
+    return {t,it,ib,live,m,st,todo,log:Object.values(it.log||{}).sort((a,b)=>(b.at||0)-(a.at||0)),at:Math.max(it.lastAt||0,ib.at||0)}; })
+    .filter(r=>r.st!=="removed"||r.log.length)                       // removed requests stay only if I decided on them
+    .sort((a,b)=>b.at-a.at);
+  const card=r=>{ const live=r.live, s=ST[r.st];
+    return `<div class="box"><div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start"><img src="https://i.ytimg.com/vi/${esc((live&&live.videoId)||r.it.videoId||r.ib.videoId)}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:112px;height:63px;object-fit:cover;border-radius:6px;background:var(--surface-2)">
+      <div><b>${esc((live&&live.title)||r.it.title||r.ib.title)}</b> <span class="muted">v${esc((live&&live.version)||r.it.version||r.ib.version||1)}</span>
+        <div style="margin:4px 0">${r.st==="checking"?'<span class="pill">Checking…</span>':r.st==="removed"?'<span class="pill">Request removed</span>':`<span class="pill ${s[1]}">${s[0]}</span>`}${r.todo?' <span class="pill no">Your decision is needed</span>':''}</div>
+        <div class="muted">${live&&live.publishAt?'Planned publish '+esc(String(live.publishAt).replace("T"," "))+' · ':''}${r.it.firstAt?'first opened '+esc(when(r.it.firstAt)):'not opened yet'}</div></div></div>
+      ${r.log.length?`<div style="margin-top:10px">${r.log.map(decRow).join('')}</div>`:''}
+      ${live?`<div class="row" style="margin-top:10px"><button class="btn ${r.todo?'dark':''}" data-open="${esc(r.t)}" style="flex:0 0 auto;min-height:38px;padding:8px 14px;font-size:13.5px">${r.todo?'Review now':'Open'}</button></div>`:''}</div>`; };
+  const G=[["Pending · waiting for your decision",rows.filter(r=>r.todo),"Nothing is waiting for you."],
+           ["Approved",rows.filter(r=>r.st==="approved"&&!r.todo)],
+           ["In review · waiting for other approvers",rows.filter(r=>r.st==="review"&&!r.todo)],
+           ["Rejected · the team is fixing it",rows.filter(r=>r.st==="changes"&&!r.todo)],
+           ["Published",rows.filter(r=>r.st==="published")],
+           ["Cancelled or removed",rows.filter(r=>r.st==="cancelled"||r.st==="removed")],
+           ["Checking…",rows.filter(r=>r.st==="checking")]];
+  let h=`<div class="box"><div class="title" style="font-size:17px">My approvals</div><p class="sub">All videos the Apple Box team asked you to review with this Google account.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><span class="pill no">Pending ${G[0][1].length}</span><span class="pill ok">Approved ${G[1][1].length}</span><span class="pill">In review ${G[2][1].length}</span><span class="pill">Rejected ${G[3][1].length}</span><span class="pill ok">Published ${G[4][1].length}</span></div></div>`;
+  if(!rows.length) h+=`<div class="box muted">Nothing here yet. Open an approval link from the Apple Box team once — after that, every new request for you shows up here automatically.</div>`;
+  G.forEach(([title,list,empty],i)=>{ if(!list.length&&!(empty&&rows.length)) return; h+=`<h3 style="margin:18px 2px 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)">${title} · ${list.length}</h3>${list.map(card).join('')||`<div class="box muted">${empty}</div>`}`; });
   return h+account(); }
-function loadLive(){ Object.keys((hist&&hist.items)||{}).forEach(t=>{ if(t in liveReq) return; liveReq[t]=undefined;       // current state of each request in my history
+function loadLive(){ [...new Set([...Object.keys((hist&&hist.items)||{}),...Object.keys((inbox&&inbox.items)||{})])].forEach(t=>{ if(t in liveReq) return; liveReq[t]=undefined;   // current state of each request
   S().get("intake/apr-"+t).then(d=>{ liveReq[t]=d&&d.kind==="approval"?d:null; if(!token) render(); }).catch(()=>{ liveReq[t]=null; if(!token) render(); }); }); }
+/* Inbox: so that requests show up before I ever open them, I own a random inboxKey (kept in my private history
+   doc). Opening any request tells the board that key (reg.<my email>); from then on the board lists every
+   request it sends me in intake/apx-<inboxKey>. */
+function ensureInbox(){ if(!hist||!user) return;
+  if(!hist.inboxKey){ hist.inboxKey=[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,"0")).join(""); S().merge(histPath(),{kind:"approver-history",email:me(),inboxKey:hist.inboxKey},user.displayName||me()).catch(e=>console.error(e)); }
+  if(!unInbox) unInbox=S().watch("intake/apx-"+hist.inboxKey,d=>{ inbox=d||{}; if(!token){ loadLive(); render(); } },err=>console.error(err)); }
 function noteSeen(){ if(!req||req.kind!=="approval"||!hist||!(req.approvers||[]).includes(me())) return;                      // remember this request in my history
+  if(hist.inboxKey&&regSaved!==token&&((req.reg||{})[emailKey(me())]||{}).inboxKey!==hist.inboxKey){ regSaved=token; S().merge("intake/apr-"+token,{reg:{[emailKey(me())]:{inboxKey:hist.inboxKey,at:Date.now()}}},user.displayName||me()).catch(e=>console.error(e)); }
   const k=token+"|"+req.version+"|"+req.title; if(seenSaved===k) return; seenSaved=k; const old=(hist.items||{})[token];
   S().merge(histPath(),{kind:"approver-history",email:me(),items:{[token]:{title:req.title||"",videoId:req.videoId||"",version:req.version,firstAt:(old&&old.firstAt)||Date.now(),lastAt:Date.now()}}},user.displayName||me()).catch(e=>console.error(e)); }
-function go(t){ token=t||""; try{ history.pushState(null,"",token?"#"+token:location.pathname); }catch(e){} mode=null; editing=false; draft=""; errMsg=""; openReq(); window.scrollTo(0,0); }
+function go(t){ token=t||""; try{ history.pushState(null,"",token?"#"+token:location.pathname); }catch(e){} mode=null; editing=false; draft=""; errMsg=""; if(!token) liveReq={}; openReq(); window.scrollTo(0,0); }
 function openReq(){ if(un){ un(); un=null; } req=undefined; render(); if(!user) return; if(!token){ loadLive(); return; }
   un=S().watch("intake/apr-"+token,d=>{ req=d; liveReq[token]=d&&d.kind==="approval"?d:null; noteSeen(); if(!mode&&!editing) render(); },err=>{ req=null; render(); }); }
 /* The approver may propose a caption (title) and description. It is stored in the public copy as
@@ -162,8 +183,8 @@ document.addEventListener('input',e=>{ if(e.target.id==='comment') draft=e.targe
 
 document.addEventListener('applebox-store-ready',()=>{
   if(!S().configured){ user=null; authErr="Not connected — please try again later."; render(); return; }
-  S().onAuth(u=>{ user=u||null; if(unHist){ unHist(); unHist=null; } hist=undefined; liveReq={}; seenSaved=""; mode=null;
-    if(user) unHist=S().watch(histPath(),d=>{ hist=d||{}; if(!token){ loadLive(); render(); } else noteSeen(); },err=>{ hist={}; if(!token) render(); });
+  S().onAuth(u=>{ user=u||null; if(unHist){ unHist(); unHist=null; } if(unInbox){ unInbox(); unInbox=null; } hist=undefined; inbox=null; liveReq={}; seenSaved=""; regSaved=""; mode=null;
+    if(user) unHist=S().watch(histPath(),d=>{ hist=d||{}; ensureInbox(); if(!token){ loadLive(); render(); } else noteSeen(); },err=>{ hist={}; if(!token) render(); });
     openReq(); });
 });
 window.addEventListener('hashchange',()=>{ const t=(location.hash||"").replace(/[^a-f0-9]/g,""); if(t!==token){ token=t; mode=null; openReq(); } });
